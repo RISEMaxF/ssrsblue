@@ -4,40 +4,30 @@ REST API gateway for controlling an ArduRover boat via BlueOS. Runs as a Docker 
 
 ## Architecture
 
-```
-                        ┌─────────────────────────┐
-                        │   Your application       │
-                        │   (MQTT sub, ROS node,   │
-                        │    script, web UI, etc.)  │
-                        └───────────┬──────────────┘
-                                    │ HTTP POST/GET
-                                    v
-┌───────────────────────────────────────────────────────────┐
-│                  blueosconnector  :8080                    │
-│                  (FastAPI on NUC)                          │
-│                                                           │
-│   ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│   │  REST API    │  │  Validators  │  │  Watchdog      │  │
-│   │  /command/*  │  │  clamp &     │  │  sends neutral │  │
-│   │  /status     │  │  sanitize    │  │  if stale      │  │
-│   │  /health     │  │  all inputs  │  │  (2s timeout)  │  │
-│   └──────┬───────┘  └──────────────┘  └────────────────┘  │
-│          │                                                │
-│   ┌──────v────────────────────────────────────────────┐   │
-│   │              MAVLink Client                       │   │
-│   │                                                   │   │
-│   │  HTTP POST ──────> BlueOS    (commands+heartbeats)│   │
-│   │  WebSocket <────── BlueOS    (telemetry)          │   │
-│   └───────────────────────┬───────────────────────────┘   │
-└───────────────────────────┼───────────────────────────────┘
-                            │ ethernet
-                            v
-                   ┌─────────────────┐
-                   │   Raspberry Pi  │  192.168.2.2
-                   │   BlueOS 1.4.3  │
-                   │   ArduRover     │
-                   │   Navigator hat │
-                   └─────────────────┘
+```mermaid
+graph TD
+    App["Your Application\n(MQTT sub, ROS node,\nscript, web UI, etc.)"]
+    App -->|HTTP POST/GET| Connector
+
+    subgraph Connector["blueosconnector :8080 — FastAPI on NUC"]
+        API["REST API\n/command/* · /status · /health"]
+        Val["Validators\nclamp & sanitize\nall inputs"]
+        WD["Watchdog\nsends neutral\nif stale (2s)"]
+        MAV["MAVLink Client"]
+
+        API --> MAV
+        Val -.- API
+        WD -.- MAV
+    end
+
+    MAV -->|"HTTP POST\n(commands + heartbeats)"| BlueOS
+    BlueOS -->|"WebSocket\n(telemetry)"| MAV
+
+    subgraph Pi["Raspberry Pi — 192.168.2.2"]
+        BlueOS["BlueOS 1.4.3\nArduRover\nNavigator hat"]
+    end
+
+    Connector ---|ethernet| Pi
 ```
 
 ## How it works
