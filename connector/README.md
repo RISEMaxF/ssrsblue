@@ -6,28 +6,37 @@ REST API gateway for controlling an ArduRover boat via BlueOS. Runs as a Docker 
 
 ```mermaid
 graph TD
-    App["Your Application\n(MQTT sub, ROS node,\nscript, web UI, etc.)"]
-    App -->|HTTP POST/GET| Connector
+    App(Your Application)
+    App -->|HTTP POST / GET| API
 
-    subgraph Connector["blueosconnector :8080 — FastAPI on NUC"]
-        API["REST API\n/command/* · /status · /health"]
-        Val["Validators\nclamp & sanitize\nall inputs"]
-        WD["Watchdog\nsends neutral\nif stale (2s)"]
-        MAV["MAVLink Client"]
+    subgraph NUC [blueosconnector :8080]
+        API(REST API)
+        Val(Validators)
+        WD(Watchdog)
+        MAV(MAVLink Client)
 
         API --> MAV
         Val -.- API
         WD -.- MAV
     end
 
-    MAV -->|"HTTP POST\n(commands + heartbeats)"| BlueOS
-    BlueOS -->|"WebSocket\n(telemetry)"| MAV
+    MAV -- "commands + heartbeats (HTTP POST)" --> BlueOS
+    BlueOS -- "telemetry (WebSocket)" --> MAV
 
-    subgraph Pi["Raspberry Pi — 192.168.2.2"]
-        BlueOS["BlueOS 1.4.3\nArduRover\nNavigator hat"]
+    subgraph RPi [Raspberry Pi · 192.168.2.2]
+        BlueOS(BlueOS + ArduRover)
     end
 
-    Connector ---|ethernet| Pi
+    NUC ---|ethernet| RPi
+
+    style App fill:#4a90d9,stroke:#2c5f8a,color:#fff
+    style NUC fill:#e8f0fe,stroke:#4a90d9,color:#1a1a1a
+    style API fill:#fff,stroke:#4a90d9,color:#1a1a1a
+    style Val fill:#fff,stroke:#4a90d9,color:#1a1a1a
+    style WD fill:#fff,stroke:#f5a623,color:#1a1a1a
+    style MAV fill:#fff,stroke:#4a90d9,color:#1a1a1a
+    style RPi fill:#fef3e0,stroke:#f5a623,color:#1a1a1a
+    style BlueOS fill:#fff,stroke:#f5a623,color:#1a1a1a
 ```
 
 ## How it works
