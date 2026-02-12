@@ -1,0 +1,13 @@
+services:
+  blueosconnector:
+    build:
+      context: .
+      target: production
+    container_name: blueosconnector
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - CONNECTOR_BLUEOS_HOST=192.168.2.2
+      - CONNECTOR_SYSTEM_ID=254
+      - CONNECTOR_WATCHDOG_TIMEOUT=2.0
+      - CONNECTOR_LOG_LEVEL=INFO
