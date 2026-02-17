@@ -19,7 +19,7 @@ import zenoh
 import keelson
 import requests
 
-from utils import enclose_from_float, enclose_from_integer, enclose_from_lon_lat
+from utils import enclose_from_float, enclose_from_integer, enclose_from_lon_lat, enclose_from_string
 
 logger = logging.getLogger("keelson-connector-blueos")
 
@@ -44,6 +44,12 @@ def publish(session, realm, entity_id, subject, source_id, value):
 def publish_status(session, realm, entity_id, source_id, data, ts):
     """Publish fields from GET /status to {source_id}/autopilot subjects."""
     src = f"{source_id}/autopilot"
+
+    publish(
+        session, realm, entity_id,
+        "vehicle_mode", src,
+        enclose_from_string(data["mode_name"], ts),
+    )
 
     publish(
         session, realm, entity_id,
