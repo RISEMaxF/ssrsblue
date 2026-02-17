@@ -57,6 +57,9 @@ class VehicleStatusResponse(BaseModel):
     heading: int
     groundspeed: float
     throttle: int
+    last_command_steering: float | None
+    last_command_throttle: float | None
+    last_command_age_s: float | None
 
 
 class GPSStatusResponse(BaseModel):

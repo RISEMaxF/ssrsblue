@@ -283,6 +283,8 @@ class MAVLinkClient:
             self._build_manual_control(steering, throttle)
         )
         if ok:
+            self.state.last_command_steering = steering
+            self.state.last_command_throttle = throttle
             self.state.last_command_received = time.monotonic()
         return ok
 

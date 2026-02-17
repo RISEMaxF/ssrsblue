@@ -25,6 +25,12 @@ async def get_status(request: Request) -> VehicleStatusResponse:
         heading=s.heading,
         groundspeed=round(s.groundspeed, 2),
         throttle=s.throttle,
+        last_command_steering=s.last_command_steering,
+        last_command_throttle=s.last_command_throttle,
+        last_command_age_s=(
+            round(time.monotonic() - s.last_command_received, 1)
+            if s.last_command_received > 0 else None
+        ),
     )
 
 

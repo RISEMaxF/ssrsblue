@@ -41,9 +41,13 @@ class VehicleState:
     groundspeed: float = 0.0
     throttle: int = 0
 
+    # Last manual control command (None = no command sent yet)
+    last_command_steering: float | None = None
+    last_command_throttle: float | None = None
+    last_command_received: float = 0.0
+
     # Timestamps (monotonic)
     last_heartbeat_received: float = field(default_factory=time.monotonic)
-    last_command_received: float = 0.0
 
     # Connection
     mavlink_connected: bool = False
