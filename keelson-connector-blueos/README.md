@@ -26,6 +26,7 @@ Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suff
 
 | API Field | Keelson Subject | Protobuf Type | Notes |
 |-----------|----------------|---------------|-------|
+| `mode_name` | `vehicle_mode` | `TimestampedString` | MANUAL, GUIDED, HOLD, etc. |
 | `heading` | `heading_true_north_deg` | `TimestampedFloat` | ArduPilot compass heading |
 | `groundspeed` | `speed_over_ground_knots` | `TimestampedFloat` | Converted from m/s (x 1.94384) |
 | `battery_voltage` | `battery_voltage_v` | `TimestampedFloat` | |
