@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     watchdog_timeout: float = 2.0
     log_level: str = "INFO"
 
+    # GPS serial reader (empty port = disabled)
+    gps_serial_port: str = ""
+    gps_serial_baud: int = 9600
+    gps_udp_host: str = "192.168.2.2"
+    gps_udp_port: int = 27000
+
     model_config = {"env_prefix": "CONNECTOR_"}
 
     @property
@@ -18,3 +24,7 @@ class Settings(BaseSettings):
     @property
     def mavlink_ws_url(self) -> str:
         return f"ws://{self.blueos_host}/mavlink2rest/ws/mavlink"
+
+    @property
+    def gps_enabled(self) -> bool:
+        return bool(self.gps_serial_port)

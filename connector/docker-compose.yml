@@ -6,8 +6,15 @@ services:
     container_name: blueosconnector
     restart: unless-stopped
     network_mode: host
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
     environment:
       - CONNECTOR_BLUEOS_HOST=192.168.2.2
       - CONNECTOR_SYSTEM_ID=254
       - CONNECTOR_WATCHDOG_TIMEOUT=2.0
       - CONNECTOR_LOG_LEVEL=INFO
+      # GPS serial reader (empty = disabled)
+      - CONNECTOR_GPS_SERIAL_PORT=/dev/ttyUSB0
+      - CONNECTOR_GPS_SERIAL_BAUD=9600
+      - CONNECTOR_GPS_UDP_HOST=192.168.2.2
+      - CONNECTOR_GPS_UDP_PORT=27000

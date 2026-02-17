@@ -6,8 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from connector.config import Settings
+from connector.gps_reader import GPSReader
+from connector.gps_state import GPSState
 from connector.mavlink_client import MAVLinkClient
 from connector.routes.commands import router as commands_router
+from connector.routes.gps import router as gps_router
 from connector.routes.status import router as status_router
 from connector.vehicle_state import VehicleState
 from connector.watchdog import watchdog_loop
@@ -30,6 +33,14 @@ async def lifespan(app: FastAPI):
     app.state.mavlink_client = client
     app.state.start_time = time.monotonic()
 
+    gps_reader: GPSReader | None = None
+    if config.gps_enabled:
+        gps_state = GPSState()
+        gps_reader = GPSReader(config, gps_state)
+        app.state.gps_state = gps_state
+        await gps_reader.start()
+        logger.info("GPS reader enabled on %s", config.gps_serial_port)
+
     await client.start()
     wd_task = asyncio.create_task(watchdog_loop(state, client, config))
     logger.info("BlueOS Connector ready — target %s", config.blueos_host)
@@ -37,6 +48,8 @@ async def lifespan(app: FastAPI):
     yield
 
     wd_task.cancel()
+    if gps_reader:
+        await gps_reader.stop()
     await client.stop()
     logger.info("BlueOS Connector stopped")
 
@@ -50,3 +63,4 @@ app = FastAPI(
 
 app.include_router(commands_router)
 app.include_router(status_router)
+app.include_router(gps_router)

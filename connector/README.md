@@ -145,7 +145,27 @@ Example responses:
   "mavlink_connected": true,
   "last_heartbeat_age_s": 0.4,
   "uptime_s": 3600.1,
-  "watchdog_active": false
+  "watchdog_active": false,
+  "gps_reader_enabled": true,
+  "gps_serial_connected": true
+}
+
+// GET /gps (returns 404 if GPS reader not enabled)
+{
+  "enabled": true,
+  "serial_connected": true,
+  "fix_quality": 1,
+  "lat": 48.1173,
+  "lon": 11.5167,
+  "altitude": 545.4,
+  "satellites": 8,
+  "hdop": 0.9,
+  "speed_knots": 5.2,
+  "course": 84.4,
+  "utc_time": "12:35:19",
+  "last_sentence_age_s": 0.3,
+  "sentences_received": 1523,
+  "parse_errors": 0
 }
 ```
 
@@ -159,6 +179,19 @@ All via environment variables (prefix `CONNECTOR_`):
 | `CONNECTOR_SYSTEM_ID` | `254` | MAVLink system ID (avoid 255 if QGC is running) |
 | `CONNECTOR_WATCHDOG_TIMEOUT` | `2.0` | Seconds before watchdog sends neutral |
 | `CONNECTOR_LOG_LEVEL` | `INFO` | Python log level |
+| `CONNECTOR_GPS_SERIAL_PORT` | `""` | Serial port for USB GPS (empty = disabled) |
+| `CONNECTOR_GPS_SERIAL_BAUD` | `9600` | GPS baud rate |
+| `CONNECTOR_GPS_UDP_HOST` | `192.168.2.2` | BlueOS IP for NMEA Injector |
+| `CONNECTOR_GPS_UDP_PORT` | `27000` | UDP port for NMEA Injector |
+
+## GPS serial reader
+
+Optional feature: reads NMEA sentences from a USB GPS receiver, parses them locally (exposed via `GET /gps`), and forwards raw NMEA to BlueOS's NMEA Injector over UDP so ArduPilot gets a GPS fix.
+
+- **Disabled by default**: set `CONNECTOR_GPS_SERIAL_PORT` to enable (e.g. `/dev/ttyUSB0`)
+- **Forward before parse**: raw NMEA goes to UDP first, then parsed locally. Even unsupported sentence types reach the NMEA Injector.
+- **Reconnection**: exponential backoff (1s → 10s max) on serial port errors
+- **Separate state**: `GET /gps` returns raw GPS data from the receiver; `GET /status` returns what ArduPilot reports. Compare them to verify GPS injection is working.
 
 ## MANUAL_CONTROL axis mapping
 
@@ -204,15 +237,20 @@ connector/
 │   ├── models.py           Pydantic request/response models
 │   ├── mavlink_client.py   WebSocket telemetry + HTTP commands
 │   ├── vehicle_state.py    Shared state + ArduRover mode map
+│   ├── gps_reader.py       Serial GPS reader + NMEA UDP forwarding
+│   ├── gps_state.py        GPS state dataclass
 │   ├── validators.py       Input clamping/validation
 │   ├── watchdog.py         Safety: neutral on stale commands
 │   └── routes/
 │       ├── commands.py     POST /command/*
-│       └── status.py       GET /status, /health
-└── tests/                  61 tests
+│       ├── status.py       GET /status, /health
+│       └── gps.py          GET /gps
+└── tests/
     ├── test_validators.py
     ├── test_routes.py
-    └── test_mavlink_payloads.py
+    ├── test_mavlink_payloads.py
+    ├── test_gps_reader.py
+    └── test_gps_routes.py
 ```
 
 ## Tests
@@ -231,3 +269,5 @@ The test suite includes:
 - **Validator tests**: Clamping ranges, mode validation, edge cases
 - **Route tests**: All endpoints with mocked MAVLink client, status codes, error handling
 - **Payload tests**: Verify actual MAVLink JSON structure matches ArduPilot expectations (axis mapping, type_mask values, quaternion encoding, thrust range, base_mode bits)
+- **GPS reader tests**: NMEA parsing (GGA, RMC, invalid), UDP forwarding with mock socket
+- **GPS route tests**: `/gps` endpoint enabled/disabled, health response with GPS fields

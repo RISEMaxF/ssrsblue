@@ -59,9 +59,28 @@ class VehicleStatusResponse(BaseModel):
     throttle: int
 
 
+class GPSStatusResponse(BaseModel):
+    enabled: bool
+    serial_connected: bool
+    fix_quality: int
+    lat: float
+    lon: float
+    altitude: float
+    satellites: int
+    hdop: float
+    speed_knots: float
+    course: float
+    utc_time: str
+    last_sentence_age_s: float
+    sentences_received: int
+    parse_errors: int
+
+
 class HealthResponse(BaseModel):
     status: str
     mavlink_connected: bool
     last_heartbeat_age_s: float
     uptime_s: float
     watchdog_active: bool
+    gps_reader_enabled: bool = False
+    gps_serial_connected: bool = False

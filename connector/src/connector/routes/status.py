@@ -47,10 +47,14 @@ async def get_health(request: Request) -> HealthResponse:
         and s.last_command_received > 0
     )
 
+    gps_state = getattr(request.app.state, "gps_state", None)
+
     return HealthResponse(
         status=status,
         mavlink_connected=s.mavlink_connected,
         last_heartbeat_age_s=round(age, 1),
         uptime_s=round(time.monotonic() - start, 1),
         watchdog_active=watchdog_active,
+        gps_reader_enabled=gps_state is not None,
+        gps_serial_connected=gps_state.serial_connected if gps_state else False,
     )
