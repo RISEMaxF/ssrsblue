@@ -19,7 +19,7 @@ import zenoh
 import keelson
 import requests
 
-from utils import enclose_from_float, enclose_from_integer, enclose_from_lon_lat, enclose_from_string
+from utils import enclose_from_boolean, enclose_from_float, enclose_from_integer, enclose_from_lon_lat, enclose_from_string
 
 logger = logging.getLogger("keelson-connector-blueos")
 
@@ -53,6 +53,12 @@ def publish_status(session, realm, entity_id, source_id, data, ts):
 
     publish(
         session, realm, entity_id,
+        "vehicle_armed", src,
+        enclose_from_boolean(data["armed"], ts),
+    )
+
+    publish(
+        session, realm, entity_id,
         "heading_true_north_deg", src,
         enclose_from_float(float(data["heading"]), ts),
     )
@@ -62,6 +68,23 @@ def publish_status(session, realm, entity_id, source_id, data, ts):
         session, realm, entity_id,
         "speed_over_ground_knots", src,
         enclose_from_float(speed_knots, ts),
+    )
+
+    # Autopilot position (always available via MAVLink, even without external GPS)
+    publish(
+        session, realm, entity_id,
+        "location_fix", src,
+        enclose_from_lon_lat(
+            longitude=data["lon"],
+            latitude=data["lat"],
+            timestamp=ts,
+        ),
+    )
+
+    publish(
+        session, realm, entity_id,
+        "gps_fix_type", src,
+        enclose_from_integer(int(data["gps_fix_type"]), ts),
     )
 
     publish(
@@ -80,6 +103,12 @@ def publish_status(session, realm, entity_id, source_id, data, ts):
         session, realm, entity_id,
         "battery_state_of_charge_pct", src,
         enclose_from_float(float(data["battery_remaining"]), ts),
+    )
+
+    publish(
+        session, realm, entity_id,
+        "autopilot_throttle_pct", src,
+        enclose_from_float(float(data["throttle"]), ts),
     )
 
     if data.get("last_command_steering") is not None:

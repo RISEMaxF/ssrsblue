@@ -4,10 +4,17 @@ import logging
 import time
 
 from keelson import enclose
-from keelson.payloads.Primitives_pb2 import TimestampedFloat, TimestampedInt, TimestampedString
+from keelson.payloads.Primitives_pb2 import TimestampedBool, TimestampedFloat, TimestampedInt, TimestampedString
 from keelson.payloads.foxglove.LocationFix_pb2 import LocationFix
 
 logger = logging.getLogger(__name__)
+
+
+def enclose_from_boolean(value: bool, timestamp: int = None) -> bytes:
+    payload = TimestampedBool()
+    payload.timestamp.FromNanoseconds(timestamp or time.time_ns())
+    payload.value = value
+    return enclose(payload.SerializeToString())
 
 
 def enclose_from_float(value: float, timestamp: int = None) -> bytes:
