@@ -181,49 +181,51 @@ def main():
         args.realm, args.entity_id, args.source_id, base_url, args.poll_interval,
     )
 
-    session = zenoh.open(conf)
-    logger.info("Zenoh session opened")
+    with zenoh.open(conf) as session:
+        logger.info("Zenoh session opened")
 
-    try:
-        while True:
-            ts = time.time_ns()
+        try:
+            while True:
+                ts = time.time_ns()
 
-            # Poll /status (always expected to be available)
-            try:
-                resp = requests.get(f"{base_url}/status", timeout=2)
-                if resp.ok:
-                    publish_status(
-                        session, args.realm, args.entity_id,
-                        args.source_id, resp.json(), ts,
-                    )
-                else:
-                    logger.warning("GET /status returned %d", resp.status_code)
-            except requests.RequestException as exc:
-                logger.warning("GET /status failed: %s", exc)
-
-            # Poll /gps (may 404 if GPS reader is disabled)
-            try:
-                resp = requests.get(f"{base_url}/gps", timeout=2)
-                if resp.ok:
-                    data = resp.json()
-                    if data.get("fix_quality", 0) > 0:
-                        publish_gps(
+                # Poll /status (always expected to be available)
+                try:
+                    resp = requests.get(f"{base_url}/status", timeout=2)
+                    if resp.ok:
+                        publish_status(
                             session, args.realm, args.entity_id,
-                            args.source_id, data, ts,
+                            args.source_id, resp.json(), ts,
                         )
                     else:
-                        logger.debug("GPS has no fix, skipping publish")
-                elif resp.status_code != 404:
-                    logger.warning("GET /gps returned %d", resp.status_code)
-            except requests.RequestException as exc:
-                logger.warning("GET /gps failed: %s", exc)
+                        logger.warning("GET /status returned %d", resp.status_code)
+                except requests.RequestException as exc:
+                    logger.warning("GET /status failed: %s", exc)
+                except (KeyError, TypeError, ValueError) as exc:
+                    logger.warning("GET /status payload error: %s", exc)
 
-            time.sleep(args.poll_interval)
+                # Poll /gps (may 404 if GPS reader is disabled)
+                try:
+                    resp = requests.get(f"{base_url}/gps", timeout=2)
+                    if resp.ok:
+                        data = resp.json()
+                        if data.get("fix_quality", 0) > 0:
+                            publish_gps(
+                                session, args.realm, args.entity_id,
+                                args.source_id, data, ts,
+                            )
+                        else:
+                            logger.debug("GPS has no fix, skipping publish")
+                    elif resp.status_code != 404:
+                        logger.warning("GET /gps returned %d", resp.status_code)
+                except requests.RequestException as exc:
+                    logger.warning("GET /gps failed: %s", exc)
+                except (KeyError, TypeError, ValueError) as exc:
+                    logger.warning("GET /gps payload error: %s", exc)
 
-    except KeyboardInterrupt:
-        logger.info("Shutting down")
-    finally:
-        session.close()
+                time.sleep(args.poll_interval)
+
+        except KeyboardInterrupt:
+            logger.info("Shutting down")
 
 
 if __name__ == "__main__":
