@@ -1,13 +1,15 @@
-"""Shared utility functions for keelson-connector-blueos."""
+"""Shared utility functions for keelson-connector-blueos.
 
-import logging
+Re-exports standard helpers from keelson.helpers and adds custom ones
+for types not covered by the SDK (boolean, lon/lat with altitude).
+"""
+
 import time
 
 from keelson import enclose
-from keelson.payloads.Primitives_pb2 import TimestampedBool, TimestampedFloat, TimestampedInt, TimestampedString
+from keelson.helpers import enclose_from_float, enclose_from_integer, enclose_from_string  # noqa: F401
+from keelson.payloads.Primitives_pb2 import TimestampedBool
 from keelson.payloads.foxglove.LocationFix_pb2 import LocationFix
-
-logger = logging.getLogger(__name__)
 
 
 def enclose_from_boolean(value: bool, timestamp: int = None) -> bytes:
@@ -17,30 +19,10 @@ def enclose_from_boolean(value: bool, timestamp: int = None) -> bytes:
     return enclose(payload.SerializeToString())
 
 
-def enclose_from_float(value: float, timestamp: int = None) -> bytes:
-    payload = TimestampedFloat()
-    payload.timestamp.FromNanoseconds(timestamp or time.time_ns())
-    payload.value = value
-    return enclose(payload.SerializeToString())
-
-
-def enclose_from_integer(value: int, timestamp: int = None) -> bytes:
-    payload = TimestampedInt()
-    payload.timestamp.FromNanoseconds(timestamp or time.time_ns())
-    payload.value = value
-    return enclose(payload.SerializeToString())
-
-
-def enclose_from_string(value: str, timestamp: int = None) -> bytes:
-    payload = TimestampedString()
-    payload.timestamp.FromNanoseconds(timestamp or time.time_ns())
-    payload.value = value
-    return enclose(payload.SerializeToString())
-
-
 def enclose_from_lon_lat(
     longitude: float, latitude: float, altitude: float = 0.0, timestamp: int = None
 ) -> bytes:
+    """Like keelson.helpers.enclose_from_lon_lat but with altitude support."""
     payload = LocationFix()
     payload.timestamp.FromNanoseconds(timestamp or time.time_ns())
     payload.latitude = latitude
