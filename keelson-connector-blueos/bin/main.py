@@ -11,6 +11,7 @@ Two source IDs are used:
   {source_id}/gps        — data from GET /gps (raw GPS, may be unavailable)
 """
 
+import json
 import time
 import logging
 import argparse
@@ -201,9 +202,9 @@ def main():
     # Configure Zenoh
     conf = zenoh.Config()
     if args.mode:
-        conf.insert_json5("mode", f'"{args.mode}"')
+        conf.insert_json5("mode", json.dumps(args.mode))
     if args.connect:
-        conf.insert_json5("connect/endpoints", f'["{args.connect}"]')
+        conf.insert_json5("connect/endpoints", json.dumps([args.connect]))
 
     logger.info(
         "Starting keelson-connector-blueos: realm=%s entity=%s source=%s url=%s interval=%.1fs",
