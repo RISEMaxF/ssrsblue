@@ -4,19 +4,4 @@ services:
     container_name: keelson-connector-blueos
     restart: unless-stopped
     network_mode: host
-    command:
-      - main.py
-      - -r
-      - rise
-      - -e
-      - ssrs18
-      - -s
-      - blueos/0
-      - --blueos-url
-      - http://localhost:8080
-      - --poll-interval
-      - "1.0"
-      - --connect
-      - tcp/localhost:7447
-      - --log-level
-      - "20"
+    command: "main.py -r rise -e ssrs18 -s blueos/0 --blueos-url http://localhost:8080 --poll-interval 1.0 --connect tcp/localhost:7447 --log-level 20"
