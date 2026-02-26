@@ -27,11 +27,15 @@ Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suff
 | API Field | Keelson Subject | Protobuf Type | Notes |
 |-----------|----------------|---------------|-------|
 | `mode_name` | `vehicle_mode` | `TimestampedString` | MANUAL, GUIDED, HOLD, etc. |
+| `armed` | `vehicle_armed` | `TimestampedBool` | Safety-critical |
 | `heading` | `heading_true_north_deg` | `TimestampedFloat` | ArduPilot compass heading |
 | `groundspeed` | `speed_over_ground_knots` | `TimestampedFloat` | Converted from m/s (x 1.94384) |
+| `lat`, `lon` | `location_fix` | `foxglove.LocationFix` | Autopilot position (always available) |
+| `gps_fix_type` | `gps_fix_type` | `TimestampedInt` | 0=none, 2=2D, 3=3D, 4=DGPS, 5=RTK |
 | `battery_voltage` | `battery_voltage_v` | `TimestampedFloat` | |
 | `battery_current` | `battery_current_a` | `TimestampedFloat` | |
 | `battery_remaining` | `battery_state_of_charge_pct` | `TimestampedFloat` | 0-100 |
+| `throttle` | `autopilot_throttle_pct` | `TimestampedFloat` | Actual output (vs commanded) |
 | `last_command_steering` | `rudder_angle_deg` | `TimestampedFloat` | Only when commands have been sent |
 | `last_command_throttle` | `engine_throttle_pct` | `TimestampedFloat` | Only when commands have been sent |
 
