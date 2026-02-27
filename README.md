@@ -18,7 +18,7 @@ graph LR
         subgraph NUC [Companion NUC]
             Conn[connector<br/>REST API :8080]
             KC[keelson-connector-blueos<br/>Telemetry → Zenoh]
-            GC[keelson-controller-gamepad<br/>Gamepad → Commands]
+            GC[controller-gamepad<br/>Gamepad → Commands]
         end
 
         RC --->|PWM| BlueOS
@@ -37,13 +37,15 @@ graph LR
     end
 
     Conn <-->|MAVLink via<br/>HTTP + WebSocket| BlueOS
-    GC -->|POST /command/<br/>manual_control| Conn
+    GC -->|"HTTP POST (direct)"| Conn
     KC -->|GET /status<br/>GET /gps| Conn
     KC -->|publish| Topics
     Topics --> MCAP
     Topics --> Fox
     Topics --> Svc
 ```
+
+> **Note:** The gamepad controller sends commands **directly** to the connector via HTTP POST — it does not go through Zenoh. This is intentional: manual control needs low latency, and the connector validates and rate-limits commands before forwarding to ArduPilot. Keelson/Zenoh is used only for the telemetry read path.
 
 ## Data flow
 
@@ -56,8 +58,8 @@ graph TD
         KC1 -->|protobuf + enclose| Z1[Zenoh subjects]
     end
 
-    subgraph Control ["Control (write path)"]
-        F310[Gamepad F310] -->|raw USB| GC1[keelson-controller-gamepad]
+    subgraph Control ["Control (write path — direct HTTP, not Zenoh)"]
+        F310[Gamepad F310] -->|raw USB| GC1[controller-gamepad]
         GC1 -->|POST steering + throttle| C2[connector]
         C2 -->|MAVLink HTTP| AP2[ArduRover]
     end
@@ -65,11 +67,11 @@ graph TD
 
 ## Containers
 
-| Container                      | Purpose                                               | Port    | Source                                                       |
-| ------------------------------ | ----------------------------------------------------- | ------- | ------------------------------------------------------------ |
-| **connector**                  | REST API gateway to ArduRover via BlueOS MAVLink2REST | `:8080` | [`connector/`](connector/)                                   |
-| **keelson-connector-blueos**   | Polls connector, publishes telemetry to Zenoh/keelson | —       | [`keelson-connector-blueos/`](keelson-connector-blueos/)     |
-| **keelson-controller-gamepad** | Reads USB gamepad, sends manual control commands      | —       | [`keelson-controller-gamepad/`](keelson-controller-gamepad/) |
+| Container                    | Purpose                                                                   | Port    | Source                                                   |
+| ---------------------------- | ------------------------------------------------------------------------- | ------- | -------------------------------------------------------- |
+| **connector**                | REST API gateway to ArduRover via BlueOS MAVLink2REST                     | `:8080` | [`connector/`](connector/)                               |
+| **keelson-connector-blueos** | Polls connector, publishes telemetry to Zenoh/keelson                     | —       | [`keelson-connector-blueos/`](keelson-connector-blueos/) |
+| **controller-gamepad**       | Reads USB gamepad, sends manual control commands (direct HTTP, not Zenoh) | —       | [`controller-gamepad/`](controller-gamepad/)             |
 
 ## Quick start
 
@@ -77,12 +79,12 @@ graph TD
 # Start everything
 docker compose -f connector/docker-compose.yml up -d
 docker compose -f keelson-connector-blueos/docker-compose.yml up -d
-docker compose -f keelson-controller-gamepad/docker-compose.yml up -d
+docker compose -f controller-gamepad/docker-compose.yml up -d
 
 # Or run locally for development
 cd connector && uv sync && uv run uvicorn connector.main:app --port 8080
 cd keelson-connector-blueos && pip install -r requirements.txt && python bin/main.py -r rise -e ssrs18 -s blueos/0 --blueos-url http://localhost:8080 --connect tcp/localhost:7447
-cd keelson-controller-gamepad && pip install -r requirements.txt && python bin/main.py --blueos-url http://localhost:8080
+cd controller-gamepad && pip install -r requirements.txt && python bin/main.py --blueos-url http://localhost:8080
 ```
 
 ## Keelson subjects published

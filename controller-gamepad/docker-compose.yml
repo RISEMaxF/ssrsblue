@@ -1,7 +1,7 @@
 services:
-  keelson-controller-gamepad:
+  controller-gamepad:
     build: .
-    container_name: keelson-controller-gamepad
+    container_name: controller-gamepad
     restart: unless-stopped
     network_mode: host
     privileged: true

@@ -10,7 +10,7 @@ import usb.core
 
 from gamepad import create_gamepad, GamepadState
 
-logger = logging.getLogger("keelson-controller-gamepad")
+logger = logging.getLogger("controller-gamepad")
 
 
 PUBLISHERS = {}
@@ -102,7 +102,7 @@ def run_loop(args, session=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="keelson-controller-gamepad: USB gamepad to BlueOS manual control"
+        description="controller-gamepad: USB gamepad to BlueOS manual control"
     )
     parser.add_argument("--blueos-url", required=True, help="BlueOS connector base URL")
     parser.add_argument("--gamepad", default="f310", help="Gamepad type (default: f310)")
@@ -126,7 +126,7 @@ def main():
     )
 
     logger.info(
-        "Starting keelson-controller-gamepad: url=%s gamepad=%s poll=%.3fs cmd=%.3fs",
+        "Starting controller-gamepad: url=%s gamepad=%s poll=%.3fs cmd=%.3fs",
         args.blueos_url, args.gamepad, args.poll_interval, args.command_interval,
     )
 

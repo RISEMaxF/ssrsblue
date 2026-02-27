@@ -1,11 +1,11 @@
-# keelson-controller-gamepad
+# controller-gamepad
 
 Reads a USB gamepad and sends `manual_control` commands (steering + throttle) to the BlueOS connector REST API. Optionally publishes commanded values to the keelson/Zenoh bus.
 
 ## Architecture
 
 ```
-USB Gamepad             keelson-controller-gamepad          BlueOS Connector
+USB Gamepad             controller-gamepad          BlueOS Connector
 ┌──────────────┐        ┌──────────────────────┐           ┌──────────────────┐
 │  Logitech    │─USB──→ │  Read + Normalize    │─POST────→ │  /command/       │
 │  F310        │ 20Hz   │  Deadzone filter     │  10Hz     │  manual_control  │
