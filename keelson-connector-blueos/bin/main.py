@@ -3,24 +3,32 @@
 """
 keelson-connector-blueos
 
-Polls the BlueOS connector REST API and publishes telemetry
-to keelson/Zenoh subjects using standard protobuf types.
+Bidirectional bridge between the BlueOS connector REST API and keelson/Zenoh:
 
-Two source IDs are used:
-  {source_id}/autopilot  — data from GET /status (ArduPilot telemetry)
-  {source_id}/gps        — data from GET /gps (raw GPS, may be unavailable)
+  READ PATH (telemetry):
+    Polls GET /status and GET /gps, publishes to Zenoh subjects.
+
+  WRITE PATH (commands):
+    Subscribes to cmd_manual_control/*, cmd_set_mode/*, cmd_arm/* on Zenoh.
+    A CommandMux selects the highest-priority active source and forwards
+    its steering+throttle to POST /command/manual_control.
+    Mode and arm commands bypass priority and forward directly.
 """
 
 import json
 import time
 import logging
 import argparse
+import threading
 
 import zenoh
 import keelson
 import requests
 
+from keelson.payloads.Primitives_pb2 import TimestampedString, TimestampedBool
+
 from utils import enclose_from_boolean, enclose_from_float, enclose_from_integer, enclose_from_lon_lat, enclose_from_string
+from command_mux import CommandMux
 
 logger = logging.getLogger("keelson-connector-blueos")
 
@@ -173,6 +181,128 @@ def publish_gps(session, realm, entity_id, source_id, data, ts):
     )
 
 
+# ── Command forwarding ────────────────────────────────────────────
+
+
+def forward_commands(mux, base_url, session, realm, entity_id, source_id,
+                     interval, stop_event):
+    """Background thread: forwards active mux command to connector REST API."""
+    mux_src = f"{source_id}/mux"
+    last_active = None
+
+    while not stop_event.is_set():
+        result = mux.get_active_command()
+
+        if result:
+            active_id, steering, throttle = result
+            try:
+                requests.post(
+                    f"{base_url}/command/manual_control",
+                    json={"steering": steering, "throttle": throttle},
+                    timeout=1,
+                )
+            except requests.RequestException as exc:
+                logger.warning("Forward manual_control failed: %s", exc)
+
+            if active_id != last_active:
+                ts = time.time_ns()
+                publish(session, realm, entity_id,
+                        "active_command_source", mux_src,
+                        enclose_from_string(active_id, ts))
+                last_active = active_id
+
+        elif last_active is not None:
+            # All sources timed out — send neutral and clear active
+            try:
+                requests.post(
+                    f"{base_url}/command/manual_control",
+                    json={"steering": 0, "throttle": 0},
+                    timeout=1,
+                )
+            except requests.RequestException as exc:
+                logger.warning("Forward neutral failed: %s", exc)
+
+            ts = time.time_ns()
+            publish(session, realm, entity_id,
+                    "active_command_source", mux_src,
+                    enclose_from_string("", ts))
+            last_active = None
+
+        stop_event.wait(interval)
+
+
+def setup_command_subscribers(session, mux, realm, entity_id, base_url):
+    """Subscribe to command subjects and wire callbacks to the mux."""
+    # Key prefix for extracting source_id from received keys
+    prefix = f"{realm}/@v0/{entity_id}/pubsub/"
+
+    # cmd_manual_control — feeds into mux priority arbitration
+    def on_manual_control(sample):
+        try:
+            key = str(sample.key_expr)
+            source_id = key[len(prefix + "cmd_manual_control/"):]
+            _, _, payload = keelson.uncover(bytes(sample.payload))
+            msg = TimestampedString()
+            msg.ParseFromString(payload)
+            data = json.loads(msg.value)
+            mux.on_manual_control(source_id, data["steering"], data["throttle"])
+        except Exception as exc:
+            logger.warning("cmd_manual_control error: %s", exc)
+
+    # cmd_set_mode — bypasses priority, forwards directly
+    def on_set_mode(sample):
+        try:
+            _, _, payload = keelson.uncover(bytes(sample.payload))
+            msg = TimestampedString()
+            msg.ParseFromString(payload)
+            mode = msg.value
+            logger.info("cmd_set_mode: %s", mode)
+            requests.post(f"{base_url}/command/set_mode",
+                          json={"mode": mode}, timeout=2)
+        except Exception as exc:
+            logger.warning("cmd_set_mode error: %s", exc)
+
+    # cmd_arm — bypasses priority, forwards directly
+    def on_arm(sample):
+        try:
+            _, _, payload = keelson.uncover(bytes(sample.payload))
+            msg = TimestampedBool()
+            msg.ParseFromString(payload)
+            arm = msg.value
+            endpoint = "arm" if arm else "disarm"
+            logger.info("cmd_arm: %s", endpoint)
+            requests.post(f"{base_url}/command/{endpoint}", timeout=2)
+        except Exception as exc:
+            logger.warning("cmd_arm error: %s", exc)
+
+    # cmd_active_source — manual override for mux
+    def on_active_source(sample):
+        try:
+            _, _, payload = keelson.uncover(bytes(sample.payload))
+            msg = TimestampedString()
+            msg.ParseFromString(payload)
+            mux.on_active_source(msg.value)
+        except Exception as exc:
+            logger.warning("cmd_active_source error: %s", exc)
+
+    subscribers = []
+    for subject, handler in [
+        ("cmd_manual_control", on_manual_control),
+        ("cmd_set_mode", on_set_mode),
+        ("cmd_arm", on_arm),
+        ("cmd_active_source", on_active_source),
+    ]:
+        key_expr = keelson.construct_pubsub_key(realm, entity_id, subject, "**")
+        sub = session.declare_subscriber(key_expr, handler)
+        logger.info("Subscribed to %s", key_expr)
+        subscribers.append(sub)
+
+    return subscribers
+
+
+# ── Main ──────────────────────────────────────────────────────────
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="keelson-connector-blueos: BlueOS REST API to keelson/Zenoh bridge"
@@ -182,7 +312,15 @@ def main():
     parser.add_argument("-s", "--source-id", required=True, help="Base source ID")
     parser.add_argument("--blueos-url", required=True, help="BlueOS connector base URL")
     parser.add_argument(
-        "--poll-interval", type=float, default=1.0, help="Seconds between polls"
+        "--poll-interval", type=float, default=1.0, help="Seconds between telemetry polls"
+    )
+    parser.add_argument(
+        "--command-timeout", type=float, default=2.0,
+        help="Default source timeout for command mux (seconds)",
+    )
+    parser.add_argument(
+        "--forward-interval", type=float, default=0.1,
+        help="Interval for forwarding commands to connector (seconds)",
     )
     parser.add_argument("--connect", type=str, default=None, help="Zenoh router endpoint")
     parser.add_argument("--mode", type=str, default=None, help="Zenoh session mode")
@@ -207,14 +345,34 @@ def main():
         conf.insert_json5("connect/endpoints", json.dumps([args.connect]))
 
     logger.info(
-        "Starting keelson-connector-blueos: realm=%s entity=%s source=%s url=%s interval=%.1fs",
-        args.realm, args.entity_id, args.source_id, base_url, args.poll_interval,
+        "Starting keelson-connector-blueos: realm=%s entity=%s source=%s url=%s poll=%.1fs fwd=%.2fs",
+        args.realm, args.entity_id, args.source_id, base_url,
+        args.poll_interval, args.forward_interval,
     )
 
     with zenoh.open(conf) as session:
         logger.info("Zenoh session opened")
 
+        # Command mux + subscribers
+        mux = CommandMux(default_timeout=args.command_timeout)
+        subscribers = setup_command_subscribers(
+            session, mux, args.realm, args.entity_id, base_url,
+        )
+
+        # Command forwarding thread
+        stop_event = threading.Event()
+        fwd_thread = threading.Thread(
+            target=forward_commands,
+            args=(mux, base_url, session, args.realm, args.entity_id,
+                  args.source_id, args.forward_interval, stop_event),
+            daemon=True,
+        )
+        fwd_thread.start()
+        logger.info("Command forwarding started (interval=%.2fs, default_timeout=%.1fs)",
+                     args.forward_interval, args.command_timeout)
+
         try:
+            # Telemetry polling loop (unchanged)
             while True:
                 ts = time.time_ns()
 
@@ -256,6 +414,11 @@ def main():
 
         except KeyboardInterrupt:
             logger.info("Shutting down")
+        finally:
+            stop_event.set()
+            fwd_thread.join(timeout=2)
+            for sub in subscribers:
+                sub.undeclare()
 
 
 if __name__ == "__main__":

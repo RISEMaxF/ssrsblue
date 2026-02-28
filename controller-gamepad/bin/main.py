@@ -5,10 +5,11 @@ import time
 import logging
 import argparse
 
-import requests
+import zenoh
 import usb.core
 
 from gamepad import create_gamepad, GamepadState
+from utils import enclose_from_float, enclose_from_string
 
 logger = logging.getLogger("controller-gamepad")
 
@@ -32,24 +33,25 @@ def publish(session, realm, entity_id, subject, source_id, value):
     pub.put(value)
 
 
-def send_command(base_url, steering, throttle):
-    try:
-        requests.post(
-            f"{base_url}/command/manual_control",
-            json={"steering": steering, "throttle": throttle},
-            timeout=1,
-        )
-    except requests.RequestException as exc:
-        logger.warning("POST /command/manual_control failed: %s", exc)
+def publish_command(session, realm, entity_id, source_id, steering, throttle, ts):
+    """Publish steering+throttle as cmd_manual_control (JSON in TimestampedString)."""
+    payload = json.dumps({"steering": steering, "throttle": throttle})
+    publish(session, realm, entity_id,
+            "cmd_manual_control", source_id,
+            enclose_from_string(payload, ts))
 
 
-def send_neutral(base_url):
-    logger.warning("Sending neutral command (steering=0, throttle=0)")
-    send_command(base_url, 0, 0)
+def publish_telemetry(session, realm, entity_id, source_id, steering, throttle, ts):
+    """Publish steering+throttle as telemetry subjects for recording."""
+    publish(session, realm, entity_id,
+            "rudder_angle_deg", source_id,
+            enclose_from_float(float(steering) / 10.0, ts))
+    publish(session, realm, entity_id,
+            "engine_throttle_pct", source_id,
+            enclose_from_float(float(throttle) / 10.0, ts))
 
 
-def run_loop(args, session=None):
-    base_url = args.blueos_url.rstrip("/")
+def run_loop(args, session):
     pad = create_gamepad(args.gamepad, deadzone=args.deadzone)
     last_command_time = 0.0
 
@@ -69,25 +71,22 @@ def run_loop(args, session=None):
                     logger.debug("steering=%d throttle=%d (lx=%.2f ly=%.2f rx=%.2f ry=%.2f lt=%.2f rt=%.2f)",
                                  steering, throttle, state.left_x, state.left_y,
                                  state.right_x, state.right_y, state.left_trigger, state.right_trigger)
-                    send_command(base_url, steering, throttle)
-                    last_command_time = now
 
-                    if session and args.realm:
-                        ts = time.time_ns()
-                        from utils import enclose_from_float
-                        src = args.source_id or "gamepad/0"
-                        publish(session, args.realm, args.entity_id,
-                                "rudder_angle_deg", src,
-                                enclose_from_float(float(steering) / 10.0, ts))
-                        publish(session, args.realm, args.entity_id,
-                                "engine_throttle_pct", src,
-                                enclose_from_float(float(throttle) / 10.0, ts))
+                    ts = time.time_ns()
+                    publish_command(session, args.realm, args.entity_id,
+                                   args.source_id, steering, throttle, ts)
+                    publish_telemetry(session, args.realm, args.entity_id,
+                                     args.source_id, steering, throttle, ts)
+                    last_command_time = now
 
                 time.sleep(args.poll_interval)
 
         except usb.core.USBError:
             logger.error("Gamepad disconnected")
-            send_neutral(base_url)
+            # Publish neutral so mux gets an immediate zero before timeout
+            ts = time.time_ns()
+            publish_command(session, args.realm, args.entity_id,
+                           args.source_id, 0, 0, ts)
             try:
                 pad.close()
             except Exception:
@@ -102,21 +101,18 @@ def run_loop(args, session=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="controller-gamepad: USB gamepad to BlueOS manual control"
+        description="controller-gamepad: USB gamepad to keelson/Zenoh commands"
     )
-    parser.add_argument("--blueos-url", required=True, help="BlueOS connector base URL")
+    parser.add_argument("-r", "--realm", required=True, help="Keelson realm")
+    parser.add_argument("-e", "--entity-id", required=True, help="Entity ID")
+    parser.add_argument("-s", "--source-id", required=True, help="Source ID (e.g. gamepad/0)")
+    parser.add_argument("--connect", required=True, help="Zenoh router endpoint")
     parser.add_argument("--gamepad", default="f310", help="Gamepad type (default: f310)")
     parser.add_argument("--deadzone", type=float, default=0.05, help="Analog stick deadzone")
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Seconds between reads")
-    parser.add_argument("--command-interval", type=float, default=0.1, help="Min seconds between API posts")
-    parser.add_argument("--log-level", type=int, default=20, help="Python log level (10=DEBUG, 20=INFO)")
-
-    # Optional Zenoh/keelson args
-    parser.add_argument("-r", "--realm", default=None, help="Keelson realm (enables Zenoh publishing)")
-    parser.add_argument("-e", "--entity-id", default=None, help="Entity ID")
-    parser.add_argument("-s", "--source-id", default=None, help="Source ID (e.g. gamepad/0)")
-    parser.add_argument("--connect", default=None, help="Zenoh router endpoint")
+    parser.add_argument("--command-interval", type=float, default=0.1, help="Min seconds between publishes")
     parser.add_argument("--mode", default=None, help="Zenoh session mode")
+    parser.add_argument("--log-level", type=int, default=20, help="Python log level (10=DEBUG, 20=INFO)")
 
     args = parser.parse_args()
 
@@ -126,28 +122,25 @@ def main():
     )
 
     logger.info(
-        "Starting controller-gamepad: url=%s gamepad=%s poll=%.3fs cmd=%.3fs",
-        args.blueos_url, args.gamepad, args.poll_interval, args.command_interval,
+        "Starting controller-gamepad: realm=%s entity=%s source=%s gamepad=%s poll=%.3fs cmd=%.3fs",
+        args.realm, args.entity_id, args.source_id,
+        args.gamepad, args.poll_interval, args.command_interval,
     )
 
-    session = None
-    if args.realm:
-        import zenoh
-        conf = zenoh.Config()
-        if args.mode:
-            conf.insert_json5("mode", json.dumps(args.mode))
-        if args.connect:
-            conf.insert_json5("connect/endpoints", json.dumps([args.connect]))
-        session = zenoh.open(conf)
-        logger.info("Zenoh session opened")
+    conf = zenoh.Config()
+    if args.mode:
+        conf.insert_json5("mode", json.dumps(args.mode))
+    conf.insert_json5("connect/endpoints", json.dumps([args.connect]))
+
+    session = zenoh.open(conf)
+    logger.info("Zenoh session opened")
 
     try:
         run_loop(args, session)
     except KeyboardInterrupt:
         logger.info("Shutting down")
     finally:
-        if session is not None:
-            session.close()
+        session.close()
 
 
 if __name__ == "__main__":

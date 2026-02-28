@@ -9,12 +9,10 @@ services:
       - /dev/bus/usb:/dev/bus/usb
     command: >-
       main.py
-      --blueos-url http://localhost:8080
+      -r rise -e ssrs18 -s gamepad/0
+      --connect tcp/localhost:7447
       --gamepad f310
       --deadzone 0.05
       --poll-interval 0.05
       --command-interval 0.1
       --log-level 20
-      # To enable Zenoh telemetry publishing, uncomment:
-      # -r rise -e ssrs18 -s gamepad/0
-      # --connect tcp/localhost:7447

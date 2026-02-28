@@ -17,8 +17,8 @@ graph LR
 
         subgraph NUC [Companion NUC]
             Conn[connector<br/>REST API :8080]
-            KC[keelson-connector-blueos<br/>Telemetry → Zenoh]
-            GC[controller-gamepad<br/>Gamepad → Commands]
+            KC[keelson-connector-blueos<br/>Telemetry + CommandMux]
+            GC[controller-gamepad<br/>Gamepad → Zenoh]
         end
 
         RC --->|PWM| BlueOS
@@ -27,7 +27,13 @@ graph LR
     end
 
     subgraph Zenoh [Zenoh Bus :7447]
-        Topics[heading, speed, battery,<br/>location, GPS, ...]
+        Telemetry[heading, speed, battery,<br/>location, GPS, ...]
+        Commands[cmd_manual_control,<br/>cmd_set_mode, cmd_arm]
+    end
+
+    subgraph ROC [Remote Operations Center]
+        RemoteUI[Remote UI]
+        Autonomy[Autonomy]
     end
 
     subgraph Consumers
@@ -37,15 +43,17 @@ graph LR
     end
 
     Conn <-->|MAVLink via<br/>HTTP + WebSocket| BlueOS
-    GC -->|"HTTP POST (direct)"| Conn
     KC -->|GET /status<br/>GET /gps| Conn
-    KC -->|publish| Topics
-    Topics --> MCAP
-    Topics --> Fox
-    Topics --> Svc
+    KC -->|POST commands| Conn
+    KC -->|publish telemetry| Telemetry
+    Commands -.->|commands| KC
+    GC -->|publish| Commands
+    RemoteUI -->|publish| Commands
+    Autonomy -->|publish| Commands
+    Telemetry --> MCAP
+    Telemetry --> Fox
+    Telemetry --> Svc
 ```
-
-> **Note:** The gamepad controller sends commands **directly** to the connector via HTTP POST — it does not go through Zenoh. This is intentional: manual control needs low latency, and the connector validates and rate-limits commands before forwarding to ArduPilot. Keelson/Zenoh is used only for the telemetry read path.
 
 ## Data flow
 
@@ -54,24 +62,53 @@ graph TD
     subgraph Telemetry ["Telemetry (read path)"]
         AP[ArduRover] -->|MAVLink WS| C1[connector]
         NMEA[USB GPS] -.->|serial| C1
-        C1 -->|GET /status<br/>GET /gps| KC1[keelson-connector-blueos]
+        C1 -->|status + GPS data| KC1[keelson-connector-blueos]
         KC1 -->|protobuf + enclose| Z1[Zenoh subjects]
     end
 
-    subgraph Control ["Control (write path — direct HTTP, not Zenoh)"]
+    subgraph Control ["Control (write path — via Zenoh CommandMux)"]
         F310[Gamepad F310] -->|raw USB| GC1[controller-gamepad]
-        GC1 -->|POST steering + throttle| C2[connector]
+        RemUI[Remote UI] -->|Zenoh| Z2[cmd_manual_control/*]
+        Auto[Autonomy] -->|Zenoh| Z2
+        GC1 -->|Zenoh| Z2
+        Z2 -->|subscribe| MUX[CommandMux<br/>in keelson-connector-blueos]
+        MUX -->|highest-priority<br/>active source| C2[connector]
         C2 -->|MAVLink HTTP| AP2[ArduRover]
     end
 ```
 
+## Command arbitration (CommandMux)
+
+All command sources publish to Zenoh and the vessel-side `CommandMux` (in keelson-connector-blueos) selects the highest-priority active source. Inspired by the ROS `twist_mux` pattern.
+
+| Source        | Priority | Timeout  | Description                   |
+| ------------- | -------- | -------- | ----------------------------- |
+| `e_stop`      | 255      | 0 (lock) | Emergency stop — stays active |
+| `gamepad/*`   | 100      | 0.5s     | Manual gamepad control        |
+| `autonomy/*`  | 50       | 2.0s     | Autonomous navigation         |
+| `remote_ui/*` | 10       | 1.0s     | Remote operator UI            |
+
+When a source stops publishing and its timeout expires, the mux falls through to the next lower-priority active source. If all sources time out, neutral (0,0) is sent.
+
+Mode changes (`cmd_set_mode`) and arm/disarm (`cmd_arm`) bypass priority — any source can send them directly.
+
+### Command subjects
+
+| Subject                 | Type                | Description                                   |
+| ----------------------- | ------------------- | --------------------------------------------- |
+| `cmd_manual_control`    | `TimestampedString` | JSON `{"steering": float, "throttle": float}` |
+| `cmd_set_mode`          | `TimestampedString` | Mode name (MANUAL, GUIDED, HOLD, etc.)        |
+| `cmd_arm`               | `TimestampedBool`   | true=arm, false=disarm                        |
+| `cmd_active_source`     | `TimestampedString` | Force a specific source (manual override)     |
+| `active_command_source` | `TimestampedString` | Published by mux: current active source       |
+
 ## Containers
 
-| Container                    | Purpose                                                                   | Port    | Source                                                   |
-| ---------------------------- | ------------------------------------------------------------------------- | ------- | -------------------------------------------------------- |
-| **connector**                | REST API gateway to ArduRover via BlueOS MAVLink2REST                     | `:8080` | [`connector/`](connector/)                               |
-| **keelson-connector-blueos** | Polls connector, publishes telemetry to Zenoh/keelson                     | —       | [`keelson-connector-blueos/`](keelson-connector-blueos/) |
-| **controller-gamepad**       | Reads USB gamepad, sends manual control commands (direct HTTP, not Zenoh) | —       | [`controller-gamepad/`](controller-gamepad/)             |
+| Container                    | Purpose                                                 | Port    | Source                                                   |
+| ---------------------------- | ------------------------------------------------------- | ------- | -------------------------------------------------------- |
+| **connector**                | REST API gateway to ArduRover via BlueOS MAVLink2REST   | `:8080` | [`connector/`](connector/)                               |
+| **keelson-connector-blueos** | Telemetry publisher + command mux (subscribe → forward) | —       | [`keelson-connector-blueos/`](keelson-connector-blueos/) |
+| **controller-gamepad**       | Reads USB gamepad, publishes commands to Zenoh          | —       | [`controller-gamepad/`](controller-gamepad/)             |
 
 ## Quick start
 
@@ -84,7 +121,7 @@ docker compose -f controller-gamepad/docker-compose.yml up -d
 # Or run locally for development
 cd connector && uv sync && uv run uvicorn connector.main:app --port 8080
 cd keelson-connector-blueos && pip install -r requirements.txt && python bin/main.py -r rise -e ssrs18 -s blueos/0 --blueos-url http://localhost:8080 --connect tcp/localhost:7447
-cd controller-gamepad && pip install -r requirements.txt && python bin/main.py --blueos-url http://localhost:8080
+cd controller-gamepad && pip install -r requirements.txt && python bin/main.py -r rise -e ssrs18 -s gamepad/0 --connect tcp/localhost:7447
 ```
 
 ## Keelson subjects published
@@ -128,7 +165,8 @@ BlueOS exposes MAVLink2REST at `http://192.168.2.2/mavlink2rest`. The connector 
 
 ## Safety
 
-- **Watchdog**: connector sends neutral steering+throttle if no commands arrive for 2s while armed
-- **Gamepad disconnect**: controller sends neutral immediately, then retries connection
+- **Command mux timeout**: if a command source stops publishing, the mux falls through to lower-priority sources; if all time out, neutral (0,0) is sent
+- **Gamepad disconnect**: controller publishes neutral immediately, then mux timeout provides backup
 - **Pilot override**: RC controller always wins via ArduRover's mode channel
 - **GCS failsafe**: if connector dies, ArduPilot triggers failsafe after 5s (no heartbeats)
+- **Watchdog**: connector sends neutral steering+throttle if no commands arrive for 2s while armed
