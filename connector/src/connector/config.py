@@ -19,11 +19,11 @@ class Settings(BaseSettings):
 
     @property
     def mavlink_rest_url(self) -> str:
-        return f"http://{self.blueos_host}/mavlink2rest/v1/mavlink"
+        return f"http://{self.blueos_host}:8088/v1/mavlink"
 
     @property
     def mavlink_ws_url(self) -> str:
-        return f"ws://{self.blueos_host}/mavlink2rest/v1/ws/mavlink"
+        return f"ws://{self.blueos_host}:8088/ws/mavlink"
 
     @property
     def gps_enabled(self) -> bool:
