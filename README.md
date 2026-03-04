@@ -157,11 +157,17 @@ cd controller-gamepad && pip install -r requirements.txt && python bin/main.py -
 ## Network
 
 ```
-NUC ──ethernet── Raspberry Pi (192.168.2.2)
-                  └── BlueOS DHCP → NUC gets 192.168.2.x
+Teltonika RUTX12 (192.168.1.1) — router, internet uplink
+  ├── sealog / NUC        (192.168.1.206)
+  ├── blueos / RPi        (192.168.1.248)
+  ├── Axis camera         (192.168.1.138)
+  ├── Ouster LiDAR        (192.168.1.142)
+  └── Ubiquiti switch     (192.168.1.134)
 ```
 
-BlueOS exposes MAVLink2REST at `http://192.168.2.2/mavlink2rest`. The connector talks to it over HTTP (commands) and WebSocket (telemetry).
+> **Note:** BlueOS defaults to running a DHCP server on its ethernet interface at `192.168.2.2`. On this vessel the RPi is instead connected to the main LAN via the Teltonika router, so the default `192.168.2.x` network is not used. The connector's `CONNECTOR_BLUEOS_HOST` is set to `192.168.1.248` to match.
+
+BlueOS exposes MAVLink2REST at `http://192.168.1.248/mavlink2rest`. The connector talks to it over HTTP (commands) and WebSocket (telemetry).
 
 ## Safety
 
