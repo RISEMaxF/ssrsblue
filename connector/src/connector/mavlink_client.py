@@ -166,15 +166,28 @@ class MAVLinkClient:
         }
 
     def _build_set_mode(self, mode_number: int) -> dict:
-        # base_mode must include CUSTOM_MODE_ENABLED (bit 0) and ARMED (bit 7) if armed
+        # Use COMMAND_LONG + MAV_CMD_DO_SET_MODE instead of deprecated SET_MODE msg.
+        # SET_MODE's base_mode is MAV_MODE enum in MAVLink2REST (not a bitmask),
+        # which can't represent arbitrary flag combos. COMMAND_LONG params are
+        # plain floats so no format issues.
+        # param1 = base_mode flags (CUSTOM_MODE_ENABLED=1, ARMED=128)
+        # param2 = custom_mode (ArduPilot mode number)
         base = 1 | (128 if self.state.armed else 0)
         return {
             "header": self._header(),
             "message": {
-                "type": "SET_MODE",
+                "type": "COMMAND_LONG",
                 "target_system": self.config.target_system,
-                "base_mode": {"bits": base},
-                "custom_mode": mode_number,
+                "target_component": self.config.target_component,
+                "command": {"type": "MAV_CMD_DO_SET_MODE"},
+                "confirmation": 0,
+                "param1": float(base),
+                "param2": float(mode_number),
+                "param3": 0.0,
+                "param4": 0.0,
+                "param5": 0.0,
+                "param6": 0.0,
+                "param7": 0.0,
             },
         }
 
@@ -266,6 +279,8 @@ class MAVLinkClient:
                 "time_boot_ms": 0,
                 "target_system": self.config.target_system,
                 "target_component": self.config.target_component,
+                # Bits 0-2: ignore roll/pitch/yaw rates. Bit 5 (32) is reserved
+                # but harmless — ArduPilot ignores it. Cleaner value would be 7.
                 "type_mask": {"bits": 39},
                 "q": q,
                 "body_roll_rate": 0.0,

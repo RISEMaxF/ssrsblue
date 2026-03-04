@@ -46,7 +46,7 @@ class CommandResponse(BaseModel):
 class VehicleStatusResponse(BaseModel):
     mode: int
     mode_name: str
-    armed: bool
+    armed: bool | None
     gps_fix_type: int
     lat: float
     lon: float

@@ -66,24 +66,30 @@ class TestManualControlPayload:
 
 
 class TestSetModePayload:
+    def test_uses_command_long(self):
+        client = _make_client()
+        payload = client._build_set_mode(15)
+        assert payload["message"]["type"] == "COMMAND_LONG"
+        assert payload["message"]["command"]["type"] == "MAV_CMD_DO_SET_MODE"
+
     def test_base_mode_disarmed(self):
         client = _make_client(armed=False)
         payload = client._build_set_mode(15)
-        bits = payload["message"]["base_mode"]["bits"]
-        assert bits & 1, "CUSTOM_MODE_ENABLED (bit 0) must be set"
-        assert not (bits & 128), "ARMED (bit 7) must NOT be set when disarmed"
+        base = payload["message"]["param1"]
+        assert int(base) & 1, "CUSTOM_MODE_ENABLED (bit 0) must be set"
+        assert not (int(base) & 128), "ARMED (bit 7) must NOT be set when disarmed"
 
     def test_base_mode_armed(self):
         client = _make_client(armed=True)
         payload = client._build_set_mode(15)
-        bits = payload["message"]["base_mode"]["bits"]
-        assert bits & 1, "CUSTOM_MODE_ENABLED must be set"
-        assert bits & 128, "ARMED must be set when armed"
+        base = payload["message"]["param1"]
+        assert int(base) & 1, "CUSTOM_MODE_ENABLED must be set"
+        assert int(base) & 128, "ARMED must be set when armed"
 
     def test_custom_mode_passthrough(self):
         client = _make_client()
         payload = client._build_set_mode(3)
-        assert payload["message"]["custom_mode"] == 3
+        assert payload["message"]["param2"] == 3.0
 
 
 class TestGuidedPositionPayload:
@@ -172,7 +178,7 @@ class TestHeartbeatPayload:
     def test_gcs_type(self):
         client = _make_client()
         payload = client._build_heartbeat()
-        assert payload["message"]["type_"]["type"] == "MAV_TYPE_GCS"
+        assert payload["message"]["mavtype"]["type"] == "MAV_TYPE_GCS"
 
     def test_system_id(self):
         client = _make_client()

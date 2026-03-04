@@ -21,11 +21,16 @@ ROVER_MODE_NAMES: dict[str, int] = {v: k for k, v in ROVER_MODES.items()}
 @dataclass
 class VehicleState:
     # From HEARTBEAT
+    # NOTE: mode defaults to 0 which maps to MANUAL in ROVER_MODES, but
+    # mode_name starts as "UNKNOWN". Before the first heartbeat, consumers
+    # should check mavlink_connected rather than trusting mode/mode_name.
     mode: int = 0
     mode_name: str = "UNKNOWN"
-    armed: bool = False
+    armed: bool | None = None  # None = unknown (no heartbeat received yet)
 
     # From GPS_RAW_INT
+    # NOTE: lat/lon default to 0.0 which is a real coordinate (Gulf of Guinea).
+    # Consumers should check gps_fix_type > 0 before trusting position data.
     gps_fix_type: int = 0
     lat: float = 0.0
     lon: float = 0.0

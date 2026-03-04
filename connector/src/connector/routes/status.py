@@ -47,7 +47,7 @@ async def get_health(request: Request) -> HealthResponse:
     else:
         status = "ok"
 
-    watchdog_active = (
+    watchdog_active = bool(
         s.armed
         and is_controllable_mode(s.mode)
         and s.last_command_received > 0

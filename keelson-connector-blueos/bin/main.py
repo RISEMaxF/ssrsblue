@@ -60,11 +60,12 @@ def publish_status(session, realm, entity_id, source_id, data, ts):
         enclose_from_string(data["mode_name"], ts),
     )
 
-    publish(
-        session, realm, entity_id,
-        "vehicle_armed", src,
-        enclose_from_boolean(data["armed"], ts),
-    )
+    if data["armed"] is not None:
+        publish(
+            session, realm, entity_id,
+            "vehicle_armed", src,
+            enclose_from_boolean(data["armed"], ts),
+        )
 
     publish(
         session, realm, entity_id,
@@ -212,7 +213,9 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
                 last_active = active_id
 
         elif last_active is not None:
-            # All sources timed out — send neutral and clear active
+            # All sources timed out — send neutral once and clear active.
+            # Only sent once per transition; the connector's own watchdog
+            # handles sustained command loss independently.
             try:
                 requests.post(
                     f"{base_url}/command/manual_control",
