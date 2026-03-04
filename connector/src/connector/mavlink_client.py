@@ -139,11 +139,12 @@ class MAVLinkClient:
             "header": self._header(),
             "message": {
                 "type": "HEARTBEAT",
-                "type_": {"type": "MAV_TYPE_GCS"},
+                "mavtype": {"type": "MAV_TYPE_GCS"},
                 "autopilot": {"type": "MAV_AUTOPILOT_INVALID"},
                 "base_mode": {"bits": 0},
                 "custom_mode": 0,
                 "system_status": {"type": "MAV_STATE_ACTIVE"},
+                "mavlink_version": 3,
             },
         }
 
