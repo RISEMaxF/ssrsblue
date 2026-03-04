@@ -49,7 +49,7 @@ class MAVLinkClient:
     # ── Telemetry (WebSocket) ──────────────────────────────
 
     async def _telemetry_loop(self) -> None:
-        msg_filter = "HEARTBEAT,GPS_RAW_INT,SYS_STATUS,VFR_HUD"
+        msg_filter = "HEARTBEAT|GPS_RAW_INT|SYS_STATUS|VFR_HUD"
         url = f"{self.config.mavlink_ws_url}?filter={msg_filter}"
         backoff = 1.0
 
