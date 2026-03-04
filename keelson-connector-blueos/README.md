@@ -1,11 +1,11 @@
 # keelson-connector-blueos
 
-Bridges the BlueOS connector REST API onto the keelson/Zenoh bus using standard keelson subjects and protobuf types. This makes ArduPilot telemetry and GPS data available to the rest of the RISE Maritime ecosystem — MCAP recording, Foxglove visualization, and other keelson services.
+Bridges the [blueos-gateway](../blueos-gateway/) REST API onto the keelson/Zenoh bus using standard keelson subjects and protobuf types. Does not talk to BlueOS/ArduPilot directly — it polls the gateway's HTTP endpoints. This makes ArduPilot telemetry and GPS data available to the rest of the RISE Maritime ecosystem — MCAP recording, Foxglove visualization, and other keelson services.
 
 ## Architecture
 
 ```
-BlueOS Connector (REST)          keelson-connector-blueos             Zenoh Bus
+blueos-gateway (REST)            keelson-connector-blueos             Zenoh Bus
 ┌──────────────────────┐         ┌─────────────────────┐         ┌──────────────────┐
 │  GET /status         │─poll──→ │  Parse + Protobuf   │─pub───→ │  .../autopilot   │
 │  (ArduPilot state)   │  1Hz    │  enclose()          │         │  heading, speed,  │
@@ -24,31 +24,31 @@ Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suff
 
 ### From `GET /status` → source `{source_id}/autopilot`
 
-| API Field | Keelson Subject | Protobuf Type | Notes |
-|-----------|----------------|---------------|-------|
-| `mode_name` | `vehicle_mode` | `TimestampedString` | MANUAL, GUIDED, HOLD, etc. |
-| `armed` | `vehicle_armed` | `TimestampedBool` | Safety-critical |
-| `heading` | `heading_true_north_deg` | `TimestampedFloat` | ArduPilot compass heading |
-| `groundspeed` | `speed_over_ground_knots` | `TimestampedFloat` | Converted from m/s (x 1.94384) |
-| `lat`, `lon` | `location_fix` | `foxglove.LocationFix` | Autopilot position (always available) |
-| `gps_fix_type` | `gps_fix_type` | `TimestampedInt` | 0=none, 2=2D, 3=3D, 4=DGPS, 5=RTK |
-| `battery_voltage` | `battery_voltage_v` | `TimestampedFloat` | |
-| `battery_current` | `battery_current_a` | `TimestampedFloat` | |
-| `battery_remaining` | `battery_state_of_charge_pct` | `TimestampedFloat` | 0-100 |
-| `throttle` | `autopilot_throttle_pct` | `TimestampedFloat` | Actual output (vs commanded) |
-| `last_command_steering` | `rudder_angle_deg` | `TimestampedFloat` | Only when commands have been sent |
-| `last_command_throttle` | `engine_throttle_pct` | `TimestampedFloat` | Only when commands have been sent |
+| API Field               | Keelson Subject               | Protobuf Type          | Notes                                 |
+| ----------------------- | ----------------------------- | ---------------------- | ------------------------------------- |
+| `mode_name`             | `vehicle_mode`                | `TimestampedString`    | MANUAL, GUIDED, HOLD, etc.            |
+| `armed`                 | `vehicle_armed`               | `TimestampedBool`      | Safety-critical                       |
+| `heading`               | `heading_true_north_deg`      | `TimestampedFloat`     | ArduPilot compass heading             |
+| `groundspeed`           | `speed_over_ground_knots`     | `TimestampedFloat`     | Converted from m/s (x 1.94384)        |
+| `lat`, `lon`            | `location_fix`                | `foxglove.LocationFix` | Autopilot position (always available) |
+| `gps_fix_type`          | `gps_fix_type`                | `TimestampedInt`       | 0=none, 2=2D, 3=3D, 4=DGPS, 5=RTK     |
+| `battery_voltage`       | `battery_voltage_v`           | `TimestampedFloat`     |                                       |
+| `battery_current`       | `battery_current_a`           | `TimestampedFloat`     |                                       |
+| `battery_remaining`     | `battery_state_of_charge_pct` | `TimestampedFloat`     | 0-100                                 |
+| `throttle`              | `autopilot_throttle_pct`      | `TimestampedFloat`     | Actual output (vs commanded)          |
+| `last_command_steering` | `rudder_angle_deg`            | `TimestampedFloat`     | Only when commands have been sent     |
+| `last_command_throttle` | `engine_throttle_pct`         | `TimestampedFloat`     | Only when commands have been sent     |
 
 ### From `GET /gps` → source `{source_id}/gps`
 
-| API Field | Keelson Subject | Protobuf Type | Notes |
-|-----------|----------------|---------------|-------|
-| `lat`, `lon`, `altitude` | `location_fix` | `foxglove.LocationFix` | WGS84, altitude in meters |
-| `satellites` | `location_fix_satellites_used` | `TimestampedInt` | |
-| `hdop` | `location_fix_hdop` | `TimestampedFloat` | |
-| `speed_knots` | `speed_over_ground_knots` | `TimestampedFloat` | From NMEA RMC |
-| `course` | `course_over_ground_deg` | `TimestampedFloat` | From NMEA RMC |
-| `altitude` | `altitude_above_msl_m` | `TimestampedFloat` | From NMEA GGA |
+| API Field                | Keelson Subject                | Protobuf Type          | Notes                     |
+| ------------------------ | ------------------------------ | ---------------------- | ------------------------- |
+| `lat`, `lon`, `altitude` | `location_fix`                 | `foxglove.LocationFix` | WGS84, altitude in meters |
+| `satellites`             | `location_fix_satellites_used` | `TimestampedInt`       |                           |
+| `hdop`                   | `location_fix_hdop`            | `TimestampedFloat`     |                           |
+| `speed_knots`            | `speed_over_ground_knots`      | `TimestampedFloat`     | From NMEA RMC             |
+| `course`                 | `course_over_ground_deg`       | `TimestampedFloat`     | From NMEA RMC             |
+| `altitude`               | `altitude_above_msl_m`         | `TimestampedFloat`     | From NMEA GGA             |
 
 GPS subjects are only published when the GPS reader is enabled and has a fix (`fix_quality > 0`). If `/gps` returns 404 (GPS reader disabled), it is silently skipped.
 
@@ -77,16 +77,16 @@ python bin/main.py \
 
 ### Arguments
 
-| Argument | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `-r` / `--realm` | yes | | Keelson realm |
-| `-e` / `--entity-id` | yes | | Entity (vessel) ID |
-| `-s` / `--source-id` | yes | | Base source ID (suffixed with `/autopilot` and `/gps`) |
-| `--blueos-url` | yes | | BlueOS connector base URL |
-| `--poll-interval` | no | `1.0` | Seconds between polls |
-| `--connect` | no | | Zenoh router endpoint(s) |
-| `--mode` | no | | Zenoh session mode (`peer` / `client`) |
-| `--log-level` | no | `20` | Python log level (`10`=DEBUG, `20`=INFO, `30`=WARNING) |
+| Argument             | Required | Default | Description                                            |
+| -------------------- | -------- | ------- | ------------------------------------------------------ |
+| `-r` / `--realm`     | yes      |         | Keelson realm                                          |
+| `-e` / `--entity-id` | yes      |         | Entity (vessel) ID                                     |
+| `-s` / `--source-id` | yes      |         | Base source ID (suffixed with `/autopilot` and `/gps`) |
+| `--blueos-url`       | yes      |         | blueos-gateway base URL                              |
+| `--poll-interval`    | no       | `1.0`   | Seconds between polls                                  |
+| `--connect`          | no       |         | Zenoh router endpoint(s)                               |
+| `--mode`             | no       |         | Zenoh session mode (`peer` / `client`)                 |
+| `--log-level`        | no       | `20`    | Python log level (`10`=DEBUG, `20`=INFO, `30`=WARNING) |
 
 ## Docker
 
@@ -98,7 +98,7 @@ Edit `docker-compose.yml` to configure realm, entity, source ID, BlueOS URL, and
 
 ## Verification
 
-1. Start the BlueOS connector (or a mock returning JSON on `/status` and `/gps`)
+1. Start the blueos-gateway (or a mock returning JSON on `/status` and `/gps`)
 2. Start a Zenoh router:
    ```bash
    docker run --rm -p 7447:7447 eclipse/zenoh:1.3.3

@@ -2,7 +2,7 @@ import time
 
 from fastapi import APIRouter, HTTPException, Request
 
-from connector.models import GPSStatusResponse
+from blueos_gateway.models import GPSStatusResponse
 
 router = APIRouter(tags=["gps"])
 

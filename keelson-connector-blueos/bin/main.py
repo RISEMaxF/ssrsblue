@@ -80,16 +80,18 @@ def publish_status(session, realm, entity_id, source_id, data, ts):
         enclose_from_float(speed_knots, ts),
     )
 
-    # Autopilot position (always available via MAVLink, even without external GPS)
-    publish(
-        session, realm, entity_id,
-        "location_fix", src,
-        enclose_from_lon_lat(
-            longitude=data["lon"],
-            latitude=data["lat"],
-            timestamp=ts,
-        ),
-    )
+    # Autopilot position — only publish when we have a real fix.
+    # With no fix, lat/lon are null (ArduPilot defaults to 0,0 which is a real place).
+    if data["lat"] is not None and data["lon"] is not None:
+        publish(
+            session, realm, entity_id,
+            "location_fix", src,
+            enclose_from_lon_lat(
+                longitude=data["lon"],
+                latitude=data["lat"],
+                timestamp=ts,
+            ),
+        )
 
     publish(
         session, realm, entity_id,

@@ -1,9 +1,9 @@
 services:
-  blueosconnector:
+  blueos-gateway:
     build:
       context: .
       target: production
-    container_name: blueosconnector
+    container_name: blueos-gateway
     restart: unless-stopped
     network_mode: host
     environment:

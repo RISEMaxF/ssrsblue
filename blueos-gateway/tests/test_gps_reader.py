@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from connector.gps_reader import GPSReader
-from connector.gps_state import GPSState
-from connector.config import Settings
+from blueos_gateway.gps_reader import GPSReader
+from blueos_gateway.gps_state import GPSState
+from blueos_gateway.config import Settings
 
 
 def _make_reader() -> tuple[GPSReader, GPSState]:

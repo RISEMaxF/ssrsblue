@@ -6,8 +6,8 @@ import time
 import pynmea2
 import serial
 
-from connector.config import Settings
-from connector.gps_state import GPSState
+from blueos_gateway.config import Settings
+from blueos_gateway.gps_state import GPSState
 
 logger = logging.getLogger(__name__)
 

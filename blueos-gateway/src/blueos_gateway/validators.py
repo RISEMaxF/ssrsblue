@@ -1,4 +1,4 @@
-from connector.vehicle_state import ROVER_MODES, ROVER_MODE_NAMES
+from blueos_gateway.vehicle_state import ROVER_MODES, ROVER_MODE_NAMES
 
 
 def clamp(value: float, lo: float, hi: float) -> int:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example usage of the BlueOS Connector API.
+Example usage of the BlueOS Gateway API.
 
-Run the connector first:
+Run the gateway first:
     docker compose up
-    # or: uv run uvicorn connector.main:app --port 8080
+    # or: uv run uvicorn blueos_gateway.main:app --port 8080
 
 Then run this script:
     uv run python examples/demo.py
@@ -19,17 +19,17 @@ import httpx
 
 # ── Defaults ───────────────────────────────────────────────
 
-# localhost works when running on the same NUC as the connector.
+# localhost works when running on the same NUC as the gateway.
 # If calling from a different machine, pass --base-url with the NUC's IP.
 DEFAULT_BASE_URL = "http://localhost:8080"
 COMMAND_RATE_HZ = 10
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BlueOS Connector demo")
+    parser = argparse.ArgumentParser(description="BlueOS Gateway demo")
     parser.add_argument(
         "--base-url", default=DEFAULT_BASE_URL,
-        help=f"Connector URL (default: {DEFAULT_BASE_URL})",
+        help=f"Gateway URL (default: {DEFAULT_BASE_URL})",
     )
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
@@ -44,9 +44,9 @@ def main():
     print(f"  Heartbeat: {health['last_heartbeat_age_s']}s ago")
 
     if health["status"] == "disconnected":
-        print("\n  Connector is not connected to BlueOS.")
+        print("\n  Gateway is not connected to BlueOS.")
         print("  Check that the Pi is powered and ethernet is plugged in.")
-        print("  The connector will keep retrying automatically.")
+        print("  The gateway will keep retrying automatically.")
         sys.exit(1)
 
     # ── 2. Vehicle status ──────────────────────────────────

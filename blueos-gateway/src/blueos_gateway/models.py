@@ -41,6 +41,7 @@ class GuidedHeadingRequest(BaseModel):
 class CommandResponse(BaseModel):
     success: bool
     message: str
+    ack_result: str | None = None
 
 
 class VehicleStatusResponse(BaseModel):
@@ -48,8 +49,8 @@ class VehicleStatusResponse(BaseModel):
     mode_name: str
     armed: bool | None
     gps_fix_type: int
-    lat: float
-    lon: float
+    lat: float | None
+    lon: float | None
     satellites_visible: int
     battery_voltage: float
     battery_current: float

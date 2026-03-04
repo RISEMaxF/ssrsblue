@@ -1,6 +1,6 @@
-# BlueOS Connector
+# BlueOS Gateway
 
-REST API gateway for controlling an ArduRover boat via BlueOS. Runs as a Docker container on a companion NUC, connected to the Raspberry Pi (BlueOS) over ethernet.
+REST API gateway for controlling an ArduRover boat via BlueOS. Runs as a Docker container on a companion NUC, connected to the Raspberry Pi (BlueOS) over ethernet. The [keelson-connector-blueos](../keelson-connector-blueos/) service polls this API to publish telemetry onto the Zenoh bus.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ graph TD
     App(Your Application)
     App -->|HTTP POST / GET| API
 
-    subgraph NUC [blueosconnector :8080]
+    subgraph NUC [blueos-gateway :8080]
         API(REST API)
         Val(Validators)
         WD(Watchdog)
@@ -41,21 +41,24 @@ graph TD
 
 ## How it works
 
-1. **On startup**, the connector opens a WebSocket to BlueOS's MAVLink2REST service and starts receiving filtered telemetry (HEARTBEAT, GPS, battery, speed).
+1. **On startup**, the gateway opens a WebSocket to BlueOS's MAVLink2REST service and starts receiving filtered telemetry (HEARTBEAT, GPS, battery, speed, COMMAND_ACK).
 
 2. **Every second**, it sends a MAVLink heartbeat to ArduPilot so the GCS failsafe doesn't trigger.
 
-3. **Your application** sends HTTP requests to the connector's REST API. The connector validates inputs, builds the correct MAVLink JSON payload, and POSTs it to BlueOS.
+3. **Your application** sends HTTP requests to the gateway's REST API. The gateway validates inputs, builds the correct MAVLink JSON payload, and POSTs it to BlueOS.
 
-4. **The watchdog** monitors command flow. If you're in GUIDED or STEERING mode and no commands arrive for 2 seconds, it sends neutral (stop) to prevent the boat from continuing at the last commanded speed.
+4. **For arm/disarm/set_mode commands**, the gateway waits for ArduPilot's `COMMAND_ACK` response (up to 3s) and returns whether the command was actually accepted — not just whether the HTTP POST succeeded.
 
-5. **The pilot** always has physical override via the ELRS RC controller. ArduRover's mode switch (`MODE_CH`) determines who's in control.
+5. **The watchdog** monitors command flow. If you're in GUIDED or STEERING mode and no commands arrive for 2 seconds, it sends neutral (stop) to prevent the boat from continuing at the last commanded speed.
+
+6. **The pilot** always has physical override via the ELRS RC controller. ArduRover's mode switch (`MODE_CH`) determines who's in control.
 
 ## Network setup
 
 Just plug an ethernet cable between the NUC and the Raspberry Pi. BlueOS runs a DHCP server and assigns the NUC an IP in the `192.168.2.x` range. No manual configuration needed.
 
 BlueOS is reachable at:
+
 - `192.168.2.2` (static IP, always works)
 - `blueos.local` (mDNS, if avahi/bonjour is available on the NUC)
 
@@ -63,9 +66,9 @@ BlueOS is reachable at:
 
 ```bash
 # Development (no Docker)
-cd connector
+cd blueos-gateway
 uv sync
-uv run uvicorn connector.main:app --port 8080 --reload
+uv run uvicorn blueos_gateway.main:app --port 8080 --reload
 
 # Run tests
 uv run pytest tests/ -v
@@ -84,14 +87,17 @@ curl -X POST http://localhost:8080/command/manual_control \
   -H "Content-Type: application/json" \
   -d '{"steering": 0, "throttle": 300}'
 
-# Set mode (by name or number)
+# Set mode (by name or number) — waits for ACK
 curl -X POST http://localhost:8080/command/set_mode \
   -H "Content-Type: application/json" \
   -d '{"mode": "GUIDED"}'
+# → {"success": true, "message": "Requested GUIDED", "ack_result": "MAV_RESULT_ACCEPTED"}
 
-# Arm / disarm
+# Arm / disarm — waits for ACK
 curl -X POST http://localhost:8080/command/arm
+# → {"success": true, "message": "Armed", "ack_result": "MAV_RESULT_ACCEPTED"}
 curl -X POST http://localhost:8080/command/disarm
+# → {"success": true, "message": "Disarmed", "ack_result": "MAV_RESULT_ACCEPTED"}
 
 # GUIDED: go to position
 curl -X POST http://localhost:8080/command/guided/position \
@@ -109,6 +115,37 @@ curl -X POST http://localhost:8080/command/guided/heading \
   -d '{"heading": 180, "speed": 1.5}'
 ```
 
+### Command ACK responses
+
+The `set_mode`, `arm`, and `disarm` endpoints wait for ArduPilot's `COMMAND_ACK` before responding. The `ack_result` field tells you what actually happened:
+
+| `ack_result`             | `success` | Meaning                                           |
+| ------------------------ | --------- | ------------------------------------------------- |
+| `MAV_RESULT_ACCEPTED`    | `true`    | ArduPilot executed the command                    |
+| `MAV_RESULT_FAILED`      | `false`   | ArduPilot rejected it (prearm checks, etc.)       |
+| `MAV_RESULT_DENIED`      | `false`   | Not allowed in current state                      |
+| `MAV_RESULT_UNSUPPORTED` | `false`   | Command not supported by this vehicle             |
+| `TIMEOUT`                | `false`   | No ACK received within 3s (link issue)            |
+| `null`                   | varies    | Fire-and-forget commands (manual_control, guided) |
+
+```bash
+# Arm fails — prearm checks not passed
+curl -X POST http://localhost:8080/command/arm
+# → {"success": false, "message": "Arm rejected: MAV_RESULT_FAILED", "ack_result": "MAV_RESULT_FAILED"}
+
+# Arm fails — BlueOS not reachable
+curl -X POST http://localhost:8080/command/arm
+# → {"success": false, "message": "Send failed", "ack_result": null}
+
+# Set mode timeout — ArduPilot didn't respond
+curl -X POST http://localhost:8080/command/set_mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "HOLD"}'
+# → {"success": false, "message": "HOLD rejected: TIMEOUT", "ack_result": "TIMEOUT"}
+```
+
+Fire-and-forget commands (`manual_control`, `guided/*`) return `ack_result: null` — they don't use COMMAND_LONG and ArduPilot doesn't ACK them.
+
 ### Status
 
 ```bash
@@ -122,7 +159,7 @@ curl http://localhost:8080/health
 Example responses:
 
 ```json
-// GET /status
+// GET /status (with GPS fix)
 {
   "mode": 15,
   "mode_name": "GUIDED",
@@ -137,6 +174,23 @@ Example responses:
   "heading": 180,
   "groundspeed": 1.2,
   "throttle": 30
+}
+
+// GET /status (no GPS fix — lat/lon are null, not 0,0)
+{
+  "mode": 0,
+  "mode_name": "MANUAL",
+  "armed": false,
+  "gps_fix_type": 0,
+  "lat": null,
+  "lon": null,
+  "satellites_visible": 0,
+  "battery_voltage": 14.1,
+  "battery_current": 0.0,
+  "battery_remaining": -1,
+  "heading": 0,
+  "groundspeed": 0.0,
+  "throttle": 0
 }
 
 // GET /health
@@ -173,16 +227,16 @@ Example responses:
 
 All via environment variables (prefix `CONNECTOR_`):
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CONNECTOR_BLUEOS_HOST` | `192.168.2.2` | BlueOS IP or hostname |
-| `CONNECTOR_SYSTEM_ID` | `254` | MAVLink system ID (avoid 255 if QGC is running) |
-| `CONNECTOR_WATCHDOG_TIMEOUT` | `2.0` | Seconds before watchdog sends neutral |
-| `CONNECTOR_LOG_LEVEL` | `INFO` | Python log level |
-| `CONNECTOR_GPS_SERIAL_PORT` | `""` | Serial port for USB GPS (empty = disabled) |
-| `CONNECTOR_GPS_SERIAL_BAUD` | `9600` | GPS baud rate |
-| `CONNECTOR_GPS_UDP_HOST` | `192.168.2.2` | BlueOS IP for NMEA Injector |
-| `CONNECTOR_GPS_UDP_PORT` | `27000` | UDP port for NMEA Injector |
+| Variable                     | Default       | Description                                     |
+| ---------------------------- | ------------- | ----------------------------------------------- |
+| `CONNECTOR_BLUEOS_HOST`      | `192.168.2.2` | BlueOS IP or hostname                           |
+| `CONNECTOR_SYSTEM_ID`        | `254`         | MAVLink system ID (avoid 255 if QGC is running) |
+| `CONNECTOR_WATCHDOG_TIMEOUT` | `2.0`         | Seconds before watchdog sends neutral           |
+| `CONNECTOR_LOG_LEVEL`        | `INFO`        | Python log level                                |
+| `CONNECTOR_GPS_SERIAL_PORT`  | `""`          | Serial port for USB GPS (empty = disabled)      |
+| `CONNECTOR_GPS_SERIAL_BAUD`  | `9600`        | GPS baud rate                                   |
+| `CONNECTOR_GPS_UDP_HOST`     | `192.168.2.2` | BlueOS IP for NMEA Injector                     |
+| `CONNECTOR_GPS_UDP_PORT`     | `27000`       | UDP port for NMEA Injector                      |
 
 ## GPS serial reader
 
@@ -197,23 +251,23 @@ Optional feature: reads NMEA sentences from a USB GPS receiver, parses them loca
 
 Verified against [ArduPilot source](https://github.com/ArduPilot/ardupilot/blob/master/Rover/GCS_MAVLink_Rover.cpp):
 
-| Axis | Range | ArduRover |
-|------|-------|-----------|
-| x | -1000..1000 | Ignored |
-| **y** | **-1000..1000** | **Steering** (-1000=full left, 0=straight, 1000=full right) |
+| Axis  | Range           | ArduRover                                                    |
+| ----- | --------------- | ------------------------------------------------------------ |
+| x     | -1000..1000     | Ignored                                                      |
+| **y** | **-1000..1000** | **Steering** (-1000=full left, 0=straight, 1000=full right)  |
 | **z** | **-1000..1000** | **Throttle** (-1000=full reverse, 0=stop, 1000=full forward) |
-| r | -1000..1000 | Ignored |
+| r     | -1000..1000     | Ignored                                                      |
 
 ## GUIDED mode type_mask values
 
 From [ArduPilot Rover Commands](https://ardupilot.org/dev/docs/mavlink-rover-commands.html):
 
-| Command | type_mask | Notes |
-|---------|-----------|-------|
-| Position only | 3580 | lat/lon via `SET_POSITION_TARGET_GLOBAL_INT` |
-| Velocity only | 3559 | vx/vy via `SET_POSITION_TARGET_LOCAL_NED` |
-| Velocity + yaw | 2535 | vx/vy + yaw target |
-| Heading + speed | 39 | via `SET_ATTITUDE_TARGET`, thrust -1..+1 |
+| Command         | type_mask | Notes                                        |
+| --------------- | --------- | -------------------------------------------- |
+| Position only   | 3580      | lat/lon via `SET_POSITION_TARGET_GLOBAL_INT` |
+| Velocity only   | 3559      | vx/vy via `SET_POSITION_TARGET_LOCAL_NED`    |
+| Velocity + yaw  | 2535      | vx/vy + yaw target                           |
+| Heading + speed | 39        | via `SET_ATTITUDE_TARGET`, thrust -1..+1     |
 
 ## Safety
 
@@ -221,17 +275,17 @@ From [ArduPilot Rover Commands](https://ardupilot.org/dev/docs/mavlink-rover-com
 - **Mode gating**: GUIDED position/velocity/heading commands are rejected with HTTP 400 if the vehicle isn't in GUIDED mode or isn't armed.
 - **Input validation**: All values clamped to valid ranges. Pydantic rejects out-of-range inputs with HTTP 422.
 - **Pilot override**: The RC controller always wins. `MODE_CH` on the RC determines the active mode. The companion cannot override the pilot's mode switch.
-- **Heartbeats**: Sent at 1 Hz. If the connector dies, ArduPilot's GCS failsafe triggers after `FS_GCS_TIMEOUT` (default 5s).
+- **Heartbeats**: Sent at 1 Hz. If the gateway dies, ArduPilot's GCS failsafe triggers after `FS_GCS_TIMEOUT` (default 5s).
 
 ## Project structure
 
 ```
-connector/
+blueos-gateway/
 ├── Dockerfile              Multi-stage: test → production
 ├── docker-compose.yml      network_mode: host, env config
 ├── pyproject.toml          uv + hatchling
 ├── uv.lock
-├── src/connector/
+├── src/blueos_gateway/
 │   ├── main.py             FastAPI app + lifespan
 │   ├── config.py           Env-based settings (CONNECTOR_*)
 │   ├── models.py           Pydantic request/response models
@@ -266,8 +320,9 @@ docker compose build
 ```
 
 The test suite includes:
+
 - **Validator tests**: Clamping ranges, mode validation, edge cases
 - **Route tests**: All endpoints with mocked MAVLink client, status codes, error handling
-- **Payload tests**: Verify actual MAVLink JSON structure matches ArduPilot expectations (axis mapping, type_mask values, quaternion encoding, thrust range, base_mode bits)
+- **Payload tests**: Verify actual MAVLink JSON structure matches ArduPilot expectations (axis mapping, type_mask values, quaternion encoding, thrust range, base_mode bits, COMMAND_ACK routing)
 - **GPS reader tests**: NMEA parsing (GGA, RMC, invalid), UDP forwarding with mock socket
 - **GPS route tests**: `/gps` endpoint enabled/disabled, health response with GPS fields

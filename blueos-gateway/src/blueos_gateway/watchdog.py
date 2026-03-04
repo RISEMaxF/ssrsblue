@@ -2,10 +2,10 @@ import asyncio
 import logging
 import time
 
-from connector.config import Settings
-from connector.mavlink_client import MAVLinkClient
-from connector.validators import is_controllable_mode
-from connector.vehicle_state import VehicleState
+from blueos_gateway.config import Settings
+from blueos_gateway.mavlink_client import MAVLinkClient
+from blueos_gateway.validators import is_controllable_mode
+from blueos_gateway.vehicle_state import VehicleState
 
 logger = logging.getLogger(__name__)
 

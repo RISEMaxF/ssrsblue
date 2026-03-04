@@ -2,8 +2,8 @@ import time
 
 from fastapi import APIRouter, Request
 
-from connector.models import HealthResponse, VehicleStatusResponse
-from connector.validators import is_controllable_mode
+from blueos_gateway.models import HealthResponse, VehicleStatusResponse
+from blueos_gateway.validators import is_controllable_mode
 
 router = APIRouter(tags=["status"])
 

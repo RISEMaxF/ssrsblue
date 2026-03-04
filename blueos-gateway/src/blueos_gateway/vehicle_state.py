@@ -29,11 +29,12 @@ class VehicleState:
     armed: bool | None = None  # None = unknown (no heartbeat received yet)
 
     # From GPS_RAW_INT
-    # NOTE: lat/lon default to 0.0 which is a real coordinate (Gulf of Guinea).
-    # Consumers should check gps_fix_type > 0 before trusting position data.
+    # None = no GPS_RAW_INT received yet or no fix (fix_type < 2).
+    # ArduPilot reports 0,0 when there's no fix, which is a real coordinate
+    # (Gulf of Guinea), so we use None to avoid misleading consumers.
     gps_fix_type: int = 0
-    lat: float = 0.0
-    lon: float = 0.0
+    lat: float | None = None
+    lon: float | None = None
     satellites_visible: int = 0
 
     # From SYS_STATUS
@@ -71,9 +72,16 @@ class VehicleState:
         if isinstance(fix, dict):
             fix = fix.get("type", 0)
         self.gps_fix_type = fix if isinstance(fix, int) else 0
-        self.lat = msg.get("lat", 0) / 1e7
-        self.lon = msg.get("lon", 0) / 1e7
         self.satellites_visible = msg.get("satellites_visible", 0)
+
+        # Only trust lat/lon when ArduPilot has at least a 2D fix.
+        # With no fix, ArduPilot reports 0,0 which is a real place.
+        if self.gps_fix_type >= 2:
+            self.lat = msg.get("lat", 0) / 1e7
+            self.lon = msg.get("lon", 0) / 1e7
+        else:
+            self.lat = None
+            self.lon = None
 
     def update_from_sys_status(self, msg: dict) -> None:
         self.battery_voltage = msg.get("voltage_battery", 0) / 1000.0

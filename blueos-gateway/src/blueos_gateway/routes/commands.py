@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from connector.models import (
+from blueos_gateway.models import (
     CommandResponse,
     GuidedHeadingRequest,
     GuidedPositionRequest,
@@ -8,8 +8,8 @@ from connector.models import (
     ManualControlRequest,
     SetModeRequest,
 )
-from connector.validators import validate_mode
-from connector.vehicle_state import ROVER_MODES
+from blueos_gateway.validators import validate_mode
+from blueos_gateway.vehicle_state import ROVER_MODES
 
 router = APIRouter(prefix="/command", tags=["commands"])
 
@@ -48,10 +48,14 @@ async def set_mode(req: SetModeRequest, request: Request) -> CommandResponse:
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     client = request.app.state.mavlink_client
-    ok = await client.send_set_mode(mode_num)
+    result = await client.send_set_mode(mode_num)
     name = ROVER_MODES.get(mode_num, str(mode_num))
+    if not result.sent:
+        return CommandResponse(success=False, message="Send failed")
     return CommandResponse(
-        success=ok, message=f"Requested {name}" if ok else "Send failed"
+        success=result.accepted,
+        message=f"Requested {name}" if result.accepted else f"{name} rejected: {result.ack_result}",
+        ack_result=result.ack_result,
     )
 
 
@@ -59,17 +63,27 @@ async def set_mode(req: SetModeRequest, request: Request) -> CommandResponse:
 async def arm(request: Request) -> CommandResponse:
     _require_connected(request)
     client = request.app.state.mavlink_client
-    ok = await client.send_arm(True)
-    return CommandResponse(success=ok, message="Arm sent" if ok else "Send failed")
+    result = await client.send_arm(True)
+    if not result.sent:
+        return CommandResponse(success=False, message="Send failed")
+    return CommandResponse(
+        success=result.accepted,
+        message="Armed" if result.accepted else f"Arm rejected: {result.ack_result}",
+        ack_result=result.ack_result,
+    )
 
 
 @router.post("/disarm", response_model=CommandResponse)
 async def disarm(request: Request) -> CommandResponse:
     _require_connected(request)
     client = request.app.state.mavlink_client
-    ok = await client.send_arm(False)
+    result = await client.send_arm(False)
+    if not result.sent:
+        return CommandResponse(success=False, message="Send failed")
     return CommandResponse(
-        success=ok, message="Disarm sent" if ok else "Send failed"
+        success=result.accepted,
+        message="Disarmed" if result.accepted else f"Disarm rejected: {result.ack_result}",
+        ack_result=result.ack_result,
     )
 
 

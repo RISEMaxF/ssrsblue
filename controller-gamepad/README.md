@@ -1,11 +1,11 @@
 # controller-gamepad
 
-Reads a USB gamepad and sends `manual_control` commands (steering + throttle) to the BlueOS connector REST API. Optionally publishes commanded values to the keelson/Zenoh bus.
+Reads a USB gamepad and sends `manual_control` commands (steering + throttle) to the blueos-gateway REST API. Optionally publishes commanded values to the keelson/Zenoh bus.
 
 ## Architecture
 
 ```
-USB Gamepad             controller-gamepad          BlueOS Connector
+USB Gamepad             controller-gamepad          blueos-gateway
 ┌──────────────┐        ┌──────────────────────┐           ┌──────────────────┐
 │  Logitech    │─USB──→ │  Read + Normalize    │─POST────→ │  /command/       │
 │  F310        │ 20Hz   │  Deadzone filter     │  10Hz     │  manual_control  │
@@ -33,7 +33,7 @@ USB Gamepad             controller-gamepad          BlueOS Connector
 
 | Argument             | Required | Default | Description                                      |
 | -------------------- | -------- | ------- | ------------------------------------------------ |
-| `--blueos-url`       | yes      |         | BlueOS connector base URL                        |
+| `--blueos-url`       | yes      |         | blueos-gateway base URL                        |
 | `--gamepad`          | no       | `f310`  | Gamepad type                                     |
 | `--deadzone`         | no       | `0.05`  | Analog stick deadzone (0.0-1.0)                  |
 | `--poll-interval`    | no       | `0.05`  | Seconds between gamepad reads                    |
@@ -62,4 +62,4 @@ Edit `docker-compose.yml` to configure the BlueOS URL and optionally enable Zeno
 
 ## Safety
 
-On gamepad disconnect (USB error), the controller immediately sends a neutral command (steering=0, throttle=0) to the BlueOS connector before attempting reconnection.
+On gamepad disconnect (USB error), the controller immediately sends a neutral command (steering=0, throttle=0) to the blueos-gateway before attempting reconnection.

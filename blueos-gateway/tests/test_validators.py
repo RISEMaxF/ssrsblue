@@ -1,6 +1,6 @@
 import pytest
 
-from connector.validators import (
+from blueos_gateway.validators import (
     clamp,
     clamp_steering,
     clamp_throttle,

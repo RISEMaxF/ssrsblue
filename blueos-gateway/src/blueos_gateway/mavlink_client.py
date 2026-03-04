@@ -3,16 +3,24 @@ import json
 import logging
 import math
 import time
+from dataclasses import dataclass
 
 import httpx
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from connector.config import Settings
-from connector.validators import clamp_steering, clamp_throttle
-from connector.vehicle_state import VehicleState
+from blueos_gateway.config import Settings
+from blueos_gateway.validators import clamp_steering, clamp_throttle
+from blueos_gateway.vehicle_state import VehicleState
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CommandResult:
+    sent: bool
+    ack_result: str  # "MAV_RESULT_ACCEPTED", "MAV_RESULT_FAILED", "TIMEOUT", etc.
+    accepted: bool   # convenience: ack_result == "MAV_RESULT_ACCEPTED"
 
 
 class MAVLinkClient:
@@ -27,6 +35,7 @@ class MAVLinkClient:
         self.state = state
         self._http: httpx.AsyncClient | None = None
         self._tasks: list[asyncio.Task] = []
+        self._ack_queues: dict[str, asyncio.Queue] = {}
 
     # ── Lifecycle ──────────────────────────────────────────
 
@@ -49,7 +58,7 @@ class MAVLinkClient:
     # ── Telemetry (WebSocket) ──────────────────────────────
 
     async def _telemetry_loop(self) -> None:
-        msg_filter = "HEARTBEAT|GPS_RAW_INT|SYS_STATUS|VFR_HUD"
+        msg_filter = "HEARTBEAT|GPS_RAW_INT|SYS_STATUS|VFR_HUD|COMMAND_ACK"
         url = f"{self.config.mavlink_ws_url}?filter={msg_filter}"
         backoff = 1.0
 
@@ -100,6 +109,17 @@ class MAVLinkClient:
             self.state.update_from_sys_status(body)
         elif mtype == "VFR_HUD":
             self.state.update_from_vfr_hud(body)
+        elif mtype == "COMMAND_ACK":
+            self._handle_command_ack(body)
+
+    def _handle_command_ack(self, body: dict) -> None:
+        cmd_name = body.get("command", {}).get("type", "")
+        q = self._ack_queues.get(cmd_name)
+        if q is not None:
+            try:
+                q.put_nowait(body)
+            except asyncio.QueueFull:
+                logger.debug("ACK queue full for %s, dropping", cmd_name)
 
     # ── Heartbeats (HTTP) ──────────────────────────────────
 
@@ -290,6 +310,27 @@ class MAVLinkClient:
             },
         }
 
+    async def _send_command_long(
+        self, payload: dict, timeout: float = 3.0
+    ) -> CommandResult:
+        cmd_name = payload["message"]["command"]["type"]
+        q: asyncio.Queue = asyncio.Queue(maxsize=1)
+        self._ack_queues[cmd_name] = q
+        try:
+            if not await self.send_message(payload):
+                return CommandResult(sent=False, ack_result="SEND_FAILED", accepted=False)
+            try:
+                ack = await asyncio.wait_for(q.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                logger.warning("No COMMAND_ACK for %s within %.1fs", cmd_name, timeout)
+                return CommandResult(sent=True, ack_result="TIMEOUT", accepted=False)
+            result = ack.get("result", {}).get("type", "UNKNOWN")
+            return CommandResult(
+                sent=True, ack_result=result, accepted=result == "MAV_RESULT_ACCEPTED"
+            )
+        finally:
+            self._ack_queues.pop(cmd_name, None)
+
     # ── Public Command Methods ─────────────────────────────
 
     async def send_manual_control(
@@ -304,11 +345,11 @@ class MAVLinkClient:
             self.state.last_command_received = time.monotonic()
         return ok
 
-    async def send_set_mode(self, mode_number: int) -> bool:
-        return await self.send_message(self._build_set_mode(mode_number))
+    async def send_set_mode(self, mode_number: int) -> CommandResult:
+        return await self._send_command_long(self._build_set_mode(mode_number))
 
-    async def send_arm(self, arm: bool) -> bool:
-        return await self.send_message(self._build_arm_disarm(arm))
+    async def send_arm(self, arm: bool) -> CommandResult:
+        return await self._send_command_long(self._build_arm_disarm(arm))
 
     async def send_guided_position(self, lat: float, lon: float) -> bool:
         ok = await self.send_message(self._build_guided_position(lat, lon))

@@ -6,11 +6,14 @@ Reference: ArduPilot source (Rover/GCS_MAVLink_Rover.cpp):
   manual_override(rover.channel_throttle, packet.z, 1000, 2000, tnow);
 """
 
+import asyncio
 import math
 
-from connector.config import Settings
-from connector.mavlink_client import MAVLinkClient
-from connector.vehicle_state import VehicleState
+import pytest
+
+from blueos_gateway.config import Settings
+from blueos_gateway.mavlink_client import MAVLinkClient
+from blueos_gateway.vehicle_state import VehicleState
 
 
 def _make_client(**state_kwargs) -> MAVLinkClient:
@@ -184,3 +187,135 @@ class TestHeartbeatPayload:
         client = _make_client()
         payload = client._build_heartbeat()
         assert payload["header"]["system_id"] == 254
+
+
+class TestCommandAckRouting:
+    def test_ack_routed_to_matching_queue(self):
+        client = _make_client()
+        q: asyncio.Queue = asyncio.Queue(maxsize=1)
+        client._ack_queues["MAV_CMD_DO_SET_MODE"] = q
+
+        ack_msg = {
+            "header": {"system_id": 1, "component_id": 1, "sequence": 0},
+            "message": {
+                "type": "COMMAND_ACK",
+                "command": {"type": "MAV_CMD_DO_SET_MODE"},
+                "result": {"type": "MAV_RESULT_ACCEPTED"},
+            },
+        }
+        client._process_message(ack_msg)
+
+        assert not q.empty()
+        body = q.get_nowait()
+        assert body["result"]["type"] == "MAV_RESULT_ACCEPTED"
+
+    def test_ack_ignored_when_no_queue(self):
+        client = _make_client()
+        # No queue registered — should not raise
+        ack_msg = {
+            "header": {"system_id": 1, "component_id": 1, "sequence": 0},
+            "message": {
+                "type": "COMMAND_ACK",
+                "command": {"type": "MAV_CMD_DO_SET_MODE"},
+                "result": {"type": "MAV_RESULT_ACCEPTED"},
+            },
+        }
+        client._process_message(ack_msg)  # should not raise
+
+    def test_ack_wrong_command_not_routed(self):
+        client = _make_client()
+        q: asyncio.Queue = asyncio.Queue(maxsize=1)
+        client._ack_queues["MAV_CMD_DO_SET_MODE"] = q
+
+        ack_msg = {
+            "header": {"system_id": 1, "component_id": 1, "sequence": 0},
+            "message": {
+                "type": "COMMAND_ACK",
+                "command": {"type": "MAV_CMD_COMPONENT_ARM_DISARM"},
+                "result": {"type": "MAV_RESULT_ACCEPTED"},
+            },
+        }
+        client._process_message(ack_msg)
+
+        assert q.empty()
+
+    @pytest.mark.asyncio
+    async def test_send_command_long_timeout(self):
+        client = _make_client()
+        # Mock send_message to succeed but no ACK arrives
+        async def fake_send(payload):
+            return True
+        client.send_message = fake_send
+
+        payload = client._build_set_mode(15)
+        result = await client._send_command_long(payload, timeout=0.05)
+
+        assert result.sent is True
+        assert result.ack_result == "TIMEOUT"
+        assert result.accepted is False
+        # Queue should be cleaned up
+        assert len(client._ack_queues) == 0
+
+    @pytest.mark.asyncio
+    async def test_send_command_long_accepted(self):
+        client = _make_client()
+
+        async def fake_send(payload):
+            # Simulate ACK arriving shortly after send
+            async def inject_ack():
+                await asyncio.sleep(0.01)
+                ack_body = {
+                    "type": "COMMAND_ACK",
+                    "command": {"type": "MAV_CMD_DO_SET_MODE"},
+                    "result": {"type": "MAV_RESULT_ACCEPTED"},
+                }
+                client._handle_command_ack(ack_body)
+            asyncio.create_task(inject_ack())
+            return True
+        client.send_message = fake_send
+
+        payload = client._build_set_mode(15)
+        result = await client._send_command_long(payload, timeout=1.0)
+
+        assert result.sent is True
+        assert result.ack_result == "MAV_RESULT_ACCEPTED"
+        assert result.accepted is True
+
+    @pytest.mark.asyncio
+    async def test_send_command_long_failed(self):
+        client = _make_client()
+
+        async def fake_send(payload):
+            async def inject_ack():
+                await asyncio.sleep(0.01)
+                ack_body = {
+                    "type": "COMMAND_ACK",
+                    "command": {"type": "MAV_CMD_COMPONENT_ARM_DISARM"},
+                    "result": {"type": "MAV_RESULT_FAILED"},
+                }
+                client._handle_command_ack(ack_body)
+            asyncio.create_task(inject_ack())
+            return True
+        client.send_message = fake_send
+
+        payload = client._build_arm_disarm(True)
+        result = await client._send_command_long(payload, timeout=1.0)
+
+        assert result.sent is True
+        assert result.ack_result == "MAV_RESULT_FAILED"
+        assert result.accepted is False
+
+    @pytest.mark.asyncio
+    async def test_send_command_long_send_fails(self):
+        client = _make_client()
+
+        async def fake_send(payload):
+            return False
+        client.send_message = fake_send
+
+        payload = client._build_set_mode(15)
+        result = await client._send_command_long(payload, timeout=0.05)
+
+        assert result.sent is False
+        assert result.ack_result == "SEND_FAILED"
+        assert result.accepted is False

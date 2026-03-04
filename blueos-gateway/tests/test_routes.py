@@ -6,10 +6,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from connector.config import Settings
-from connector.routes.commands import router as commands_router
-from connector.routes.status import router as status_router
-from connector.vehicle_state import VehicleState
+from blueos_gateway.config import Settings
+from blueos_gateway.mavlink_client import CommandResult
+from blueos_gateway.routes.commands import router as commands_router
+from blueos_gateway.routes.status import router as status_router
+from blueos_gateway.vehicle_state import VehicleState
 
 
 def _make_app(state: VehicleState, mock_mavlink: AsyncMock) -> FastAPI:
@@ -41,8 +42,12 @@ def client():
 
     mock_mavlink = AsyncMock()
     mock_mavlink.send_manual_control = AsyncMock(return_value=True)
-    mock_mavlink.send_set_mode = AsyncMock(return_value=True)
-    mock_mavlink.send_arm = AsyncMock(return_value=True)
+    mock_mavlink.send_set_mode = AsyncMock(
+        return_value=CommandResult(sent=True, ack_result="MAV_RESULT_ACCEPTED", accepted=True)
+    )
+    mock_mavlink.send_arm = AsyncMock(
+        return_value=CommandResult(sent=True, ack_result="MAV_RESULT_ACCEPTED", accepted=True)
+    )
     mock_mavlink.send_guided_position = AsyncMock(return_value=True)
     mock_mavlink.send_guided_velocity = AsyncMock(return_value=True)
     mock_mavlink.send_guided_heading = AsyncMock(return_value=True)

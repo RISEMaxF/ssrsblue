@@ -1,5 +1,5 @@
 [project]
-name = "blueosconnector"
+name = "blueos-gateway"
 version = "0.1.0"
 description = "REST API gateway for BlueOS ArduRover boat control"
 requires-python = ">=3.11"
@@ -17,7 +17,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/connector"]
+packages = ["src/blueos_gateway"]
 
 [dependency-groups]
 dev = [

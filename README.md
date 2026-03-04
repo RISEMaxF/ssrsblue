@@ -16,7 +16,7 @@ graph LR
         end
 
         subgraph NUC [Companion NUC]
-            Conn[connector<br/>REST API :8080]
+            Conn[blueos-gateway<br/>REST API :8080]
             KC[keelson-connector-blueos<br/>Telemetry + CommandMux]
             GC[controller-gamepad<br/>Gamepad → Zenoh]
         end
@@ -60,7 +60,7 @@ graph LR
 ```mermaid
 graph TD
     subgraph Telemetry ["Telemetry (read path)"]
-        AP[ArduRover] -->|MAVLink WS| C1[connector]
+        AP[ArduRover] -->|MAVLink WS| C1[blueos-gateway]
         NMEA[USB GPS] -.->|serial| C1
         C1 -->|status + GPS data| KC1[keelson-connector-blueos]
         KC1 -->|protobuf + enclose| Z1[Zenoh subjects]
@@ -72,7 +72,7 @@ graph TD
         Auto[Autonomy] -->|Zenoh| Z2
         GC1 -->|Zenoh| Z2
         Z2 -->|subscribe| MUX[CommandMux<br/>in keelson-connector-blueos]
-        MUX -->|highest-priority<br/>active source| C2[connector]
+        MUX -->|highest-priority<br/>active source| C2[blueos-gateway]
         C2 -->|MAVLink HTTP| AP2[ArduRover]
     end
 ```
@@ -106,7 +106,7 @@ Mode changes (`cmd_set_mode`) and arm/disarm (`cmd_arm`) bypass priority — any
 
 | Container                    | Purpose                                                 | Port    | Source                                                   |
 | ---------------------------- | ------------------------------------------------------- | ------- | -------------------------------------------------------- |
-| **connector**                | REST API gateway to ArduRover via BlueOS MAVLink2REST   | `:8080` | [`connector/`](connector/)                               |
+| **blueos-gateway**           | REST API gateway to ArduRover via BlueOS MAVLink2REST   | `:8080` | [`blueos-gateway/`](blueos-gateway/)                     |
 | **keelson-connector-blueos** | Telemetry publisher + command mux (subscribe → forward) | —       | [`keelson-connector-blueos/`](keelson-connector-blueos/) |
 | **controller-gamepad**       | Reads USB gamepad, publishes commands to Zenoh          | —       | [`controller-gamepad/`](controller-gamepad/)             |
 
@@ -114,12 +114,12 @@ Mode changes (`cmd_set_mode`) and arm/disarm (`cmd_arm`) bypass priority — any
 
 ```bash
 # Start everything
-docker compose -f connector/docker-compose.yml up -d
+docker compose -f blueos-gateway/docker-compose.yml up -d
 docker compose -f keelson-connector-blueos/docker-compose.yml up -d
 docker compose -f controller-gamepad/docker-compose.yml up -d
 
 # Or run locally for development
-cd connector && uv sync && uv run uvicorn connector.main:app --port 8080
+cd blueos-gateway && uv sync && uv run uvicorn blueos_gateway.main:app --port 8080
 cd keelson-connector-blueos && pip install -r requirements.txt && python bin/main.py -r rise -e ssrs18 -s blueos/0 --blueos-url http://localhost:8080 --connect tcp/localhost:7447
 cd controller-gamepad && pip install -r requirements.txt && python bin/main.py -r rise -e ssrs18 -s gamepad/0 --connect tcp/localhost:7447
 ```
@@ -165,14 +165,14 @@ Teltonika RUTX12 (192.168.1.1) — router, internet uplink
   └── Ubiquiti switch     (192.168.1.134)
 ```
 
-> **Note:** BlueOS defaults to running a DHCP server on its ethernet interface at `192.168.2.2`. On this vessel the RPi is instead connected to the main LAN via the Teltonika router, so the default `192.168.2.x` network is not used. The connector's `CONNECTOR_BLUEOS_HOST` is set to `192.168.1.248` to match.
+> **Note:** BlueOS defaults to running a DHCP server on its ethernet interface at `192.168.2.2`. On this vessel the RPi is instead connected to the main LAN via the Teltonika router, so the default `192.168.2.x` network is not used. The gateway's `CONNECTOR_BLUEOS_HOST` is set to `192.168.1.248` to match.
 
-BlueOS exposes MAVLink2REST at `http://192.168.1.248/mavlink2rest`. The connector talks to it over HTTP (commands) and WebSocket (telemetry).
+BlueOS exposes MAVLink2REST at `http://192.168.1.248/mavlink2rest`. The gateway talks to it over HTTP (commands) and WebSocket (telemetry).
 
 ## Safety
 
 - **Command mux timeout**: if a command source stops publishing, the mux falls through to lower-priority sources; if all time out, neutral (0,0) is sent
 - **Gamepad disconnect**: controller publishes neutral immediately, then mux timeout provides backup
 - **Pilot override**: RC controller always wins via ArduRover's mode channel
-- **GCS failsafe**: if connector dies, ArduPilot triggers failsafe after 5s (no heartbeats)
-- **Watchdog**: connector sends neutral steering+throttle if no commands arrive for 2s while armed
+- **GCS failsafe**: if blueos-gateway dies, ArduPilot triggers failsafe after 5s (no heartbeats)
+- **Watchdog**: blueos-gateway sends neutral steering+throttle if no commands arrive for 2s while armed

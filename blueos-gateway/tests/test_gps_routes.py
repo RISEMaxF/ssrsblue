@@ -6,11 +6,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from connector.config import Settings
-from connector.gps_state import GPSState
-from connector.routes.gps import router as gps_router
-from connector.routes.status import router as status_router
-from connector.vehicle_state import VehicleState
+from blueos_gateway.config import Settings
+from blueos_gateway.gps_state import GPSState
+from blueos_gateway.routes.gps import router as gps_router
+from blueos_gateway.routes.status import router as status_router
+from blueos_gateway.vehicle_state import VehicleState
 
 
 def _make_app(*, gps_enabled: bool = False) -> FastAPI:
