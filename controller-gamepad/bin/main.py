@@ -9,7 +9,7 @@ import zenoh
 import usb.core
 
 from gamepad import create_gamepad, GamepadState
-from utils import enclose_from_float, enclose_from_string
+from utils import enclose_from_boolean, enclose_from_float, enclose_from_string
 
 logger = logging.getLogger("controller-gamepad")
 
@@ -41,6 +41,14 @@ def publish_command(session, realm, entity_id, source_id, steering, throttle, ts
             enclose_from_string(payload, ts))
 
 
+def publish_arm(session, realm, entity_id, source_id, armed, ts):
+    """Publish arm/disarm command as cmd_arm (TimestampedBool)."""
+    publish(session, realm, entity_id,
+            "cmd_arm", source_id,
+            enclose_from_boolean(armed, ts))
+    logger.info("Published cmd_arm=%s", armed)
+
+
 def publish_telemetry(session, realm, entity_id, source_id, steering, throttle, ts):
     """Publish steering+throttle as telemetry subjects for recording."""
     publish(session, realm, entity_id,
@@ -54,6 +62,9 @@ def publish_telemetry(session, realm, entity_id, source_id, steering, throttle, 
 def run_loop(args, session):
     pad = create_gamepad(args.gamepad, deadzone=args.deadzone)
     last_command_time = 0.0
+    armed = False
+    prev_start = False
+    last_arm_toggle_time = 0.0
 
     while True:
         try:
@@ -63,14 +74,25 @@ def run_loop(args, session):
             while True:
                 state = pad.read()
 
-                steering = int(state.left_x * 1000)
-                throttle = int(-state.left_y * 1000)
+                throttle = int(state.left_y * 1000)
+                steering = int(state.right_x * 1000)
 
                 now = time.monotonic()
+
+                # Arm/disarm toggle on Start button (rising edge + 1s cooldown)
+                start_pressed = state.buttons.get("START", False)
+                if start_pressed and not prev_start and (now - last_arm_toggle_time) >= 1.0:
+                    armed = not armed
+                    ts = time.time_ns()
+                    publish_arm(session, args.realm, args.entity_id,
+                                args.source_id, armed, ts)
+                    last_arm_toggle_time = now
+                prev_start = start_pressed
+
                 if now - last_command_time >= args.command_interval:
-                    logger.debug("steering=%d throttle=%d (lx=%.2f ly=%.2f rx=%.2f ry=%.2f lt=%.2f rt=%.2f)",
-                                 steering, throttle, state.left_x, state.left_y,
-                                 state.right_x, state.right_y, state.left_trigger, state.right_trigger)
+                    logger.debug("throttle=%d steering=%d (ly=%.2f rx=%.2f lx=%.2f ry=%.2f lt=%.2f rt=%.2f armed=%s)",
+                                 throttle, steering, state.left_y, state.right_x,
+                                 state.left_x, state.right_y, state.left_trigger, state.right_trigger, armed)
 
                     ts = time.time_ns()
                     publish_command(session, args.realm, args.entity_id,
