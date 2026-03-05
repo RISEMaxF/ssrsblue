@@ -25,11 +25,11 @@ USB Gamepad        controller-gamepad              Zenoh Bus
 
 ## Control Mapping
 
-| Input         | Action     | Output Range  | Notes                         |
-| ------------- | ---------- | ------------- | ----------------------------- |
-| Left stick Y  | Throttle   | -1000 to 1000 | Forward positive (Y inverted) |
-| Right stick X | Steering   | -1000 to 1000 | Right positive                |
-| Start button  | Arm/Disarm | bool          | Toggle with 1s cooldown       |
+| Input         | Action     | Output Range  | Notes                   |
+| ------------- | ---------- | ------------- | ----------------------- |
+| Left stick Y  | Throttle   | -1000 to 1000 | Forward positive        |
+| Right stick X | Steering   | -1000 to 1000 | Right positive          |
+| Start button  | Arm/Disarm | bool          | Toggle with 1s cooldown |
 
 ## Supported Gamepads
 
@@ -61,7 +61,7 @@ All three services must be running on the NUC:
 2. **blueos-gateway** — see `blueos-gateway/docker-compose.yml`
 3. **keelson-connector-blueos** — see `keelson-connector-blueos/docker-compose.yml`
 
-### Starting the gamepad controller
+### Starting the gamepad controller (Docker, on the NUC)
 
 ```bash
 cd controller-gamepad
@@ -69,6 +69,36 @@ docker compose up --build -d
 ```
 
 The container runs with `privileged: true` and mounts `/dev/bus/usb` for raw USB access. The F310 must be plugged in before starting (it will retry on disconnect).
+
+### Running on macOS
+
+You can run the gamepad controller on a Mac with the F310 connected locally, publishing to a remote Zenoh router over an SSH tunnel.
+
+**Install dependencies:**
+
+```bash
+brew install libusb
+cd controller-gamepad
+uv venv && uv pip install -r requirements.txt
+```
+
+**Set up an SSH tunnel** to forward the Zenoh router port from the remote NUC:
+
+```bash
+ssh -L 7447:localhost:7447 <nuc-host>
+```
+
+**Run the controller** (in a separate terminal):
+
+```bash
+DYLD_LIBRARY_PATH=$(brew --prefix libusb)/lib uv run python bin/main.py \
+  -r rise -e ssrs18 -s gamepad/0 \
+  --connect tcp/localhost:7447 \
+  --gamepad f310 \
+  --log-level 10
+```
+
+The `DYLD_LIBRARY_PATH` is needed because pyusb requires libusb but macOS doesn't add Homebrew libraries to the default search path.
 
 ### Verifying
 
