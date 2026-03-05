@@ -43,7 +43,7 @@ def _require_controllable(request: Request) -> None:
 async def manual_control(
     req: ManualControlRequest, request: Request
 ) -> CommandResponse:
-    _require_controllable(request)
+    _require_connected(request)
     client = request.app.state.mavlink_client
     ok = await client.send_manual_control(req.steering, req.throttle)
     return CommandResponse(success=ok, message="OK" if ok else "Send failed")

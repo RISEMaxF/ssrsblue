@@ -101,7 +101,7 @@ class TestManualControl:
         )
         assert resp.status_code == 503
 
-    def test_rejected_in_manual_mode(self, client):
+    def test_allowed_in_manual_mode(self, client):
         tc, state, _ = client
         state.mode = 0
         state.mode_name = "MANUAL"
@@ -109,8 +109,7 @@ class TestManualControl:
             "/command/manual_control",
             json={"steering": 0, "throttle": 500},
         )
-        assert resp.status_code == 400
-        assert "MANUAL" in resp.json()["detail"]
+        assert resp.status_code == 200
 
 
 class TestSetMode:
