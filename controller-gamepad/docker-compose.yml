@@ -7,12 +7,7 @@ services:
     privileged: true
     volumes:
       - /dev/bus/usb:/dev/bus/usb
-    command: >-
-      main.py
-      -r rise -e ssrs18 -s gamepad/0
-      --connect tcp/localhost:7447
-      --gamepad f310
-      --deadzone 0.05
-      --poll-interval 0.05
-      --command-interval 0.1
-      --log-level 20
+    command:
+      [
+        "main.py -r rise -e ssrs18 -s gamepad/0 --connect tcp/localhost:7447 --gamepad f310 --deadzone 0.05 --poll-interval 0.05 --command-interval 0.1 --log-level 20",
+      ]
