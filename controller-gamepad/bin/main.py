@@ -62,6 +62,8 @@ def publish_telemetry(session, realm, entity_id, source_id, steering, throttle, 
 def run_loop(args, session):
     pad = create_gamepad(args.gamepad, deadzone=args.deadzone)
     last_command_time = 0.0
+    last_steering = None
+    last_throttle = None
     armed = False
     prev_start = False
     last_arm_toggle_time = 0.0
@@ -89,7 +91,10 @@ def run_loop(args, session):
                     last_arm_toggle_time = now
                 prev_start = start_pressed
 
-                if now - last_command_time >= args.command_interval:
+                # Publish on value change or heartbeat every 0.3s
+                changed = (steering != last_steering or throttle != last_throttle)
+                elapsed = now - last_command_time
+                if changed or elapsed >= 0.3:
                     logger.debug("throttle=%d steering=%d (ly=%.2f rx=%.2f lx=%.2f ry=%.2f lt=%.2f rt=%.2f armed=%s)",
                                  throttle, steering, state.left_y, state.right_x,
                                  state.left_x, state.right_y, state.left_trigger, state.right_trigger, armed)
@@ -100,6 +105,8 @@ def run_loop(args, session):
                     publish_telemetry(session, args.realm, args.entity_id,
                                      args.source_id, steering, throttle, ts)
                     last_command_time = now
+                    last_steering = steering
+                    last_throttle = throttle
 
                 time.sleep(args.poll_interval)
 
@@ -132,7 +139,6 @@ def main():
     parser.add_argument("--gamepad", default="f310", help="Gamepad type (default: f310)")
     parser.add_argument("--deadzone", type=float, default=0.05, help="Analog stick deadzone")
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Seconds between reads")
-    parser.add_argument("--command-interval", type=float, default=0.1, help="Min seconds between publishes")
     parser.add_argument("--mode", default=None, help="Zenoh session mode")
     parser.add_argument("--log-level", type=int, default=20, help="Python log level (10=DEBUG, 20=INFO)")
 
@@ -144,9 +150,9 @@ def main():
     )
 
     logger.info(
-        "Starting controller-gamepad: realm=%s entity=%s source=%s gamepad=%s poll=%.3fs cmd=%.3fs",
+        "Starting controller-gamepad: realm=%s entity=%s source=%s gamepad=%s poll=%.3fs",
         args.realm, args.entity_id, args.source_id,
-        args.gamepad, args.poll_interval, args.command_interval,
+        args.gamepad, args.poll_interval,
     )
 
     conf = zenoh.Config()

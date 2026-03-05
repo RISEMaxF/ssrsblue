@@ -48,7 +48,6 @@ USB Gamepad        controller-gamepad              Zenoh Bus
 | `--gamepad`          | no       | `f310`  | Gamepad type                                     |
 | `--deadzone`         | no       | `0.05`  | Analog stick deadzone (0.0-1.0)                  |
 | `--poll-interval`    | no       | `0.05`  | Seconds between gamepad reads                    |
-| `--command-interval` | no       | `0.1`   | Min seconds between publishes                    |
 | `--mode`             | no       |         | Zenoh session mode (`peer` / `client`)           |
 | `--log-level`        | no       | `20`    | Python log level (10=DEBUG, 20=INFO, 30=WARNING) |
 
