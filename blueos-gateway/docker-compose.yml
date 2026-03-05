@@ -8,7 +8,7 @@ services:
     network_mode: host
     environment:
       - CONNECTOR_BLUEOS_HOST=192.168.1.248
-      - CONNECTOR_SYSTEM_ID=254
+      - CONNECTOR_SYSTEM_ID=255
       - CONNECTOR_WATCHDOG_TIMEOUT=2.0
       - CONNECTOR_LOG_LEVEL=INFO
       # GPS serial reader disabled (no USB GPS dongle yet)
