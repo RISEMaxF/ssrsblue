@@ -18,9 +18,19 @@ blueos-gateway (REST)            keelson-connector-blueos             Zenoh Bus
 
 Follows the standard `keelson-connector-*` pattern: synchronous poll loop, lazy publisher caching, `keelson.enclose()` + protobuf serialization.
 
-## Subject Mapping
+## Zenoh Key Structure
 
-Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suffixed with `/autopilot` and `/gps` so consumers can distinguish ArduPilot's filtered telemetry from the raw GPS receiver.
+All keys follow the keelson convention:
+
+```
+{realm}/@v0/{entity_id}/pubsub/{subject}/{source_id}
+```
+
+Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suffixed with `/autopilot` and `/gps` so consumers can distinguish ArduPilot's filtered telemetry from the raw GPS receiver. The connector also publishes mux status under `{source_id}/mux`.
+
+All payloads are keelson-enveloped protobuf (the `enclose()` wrapper adds framing and a schema tag).
+
+## Telemetry (Published)
 
 ### From `GET /status` → source `{source_id}/autopilot`
 
@@ -52,6 +62,23 @@ Two source IDs are published. The base `--source-id` (e.g. `blueos/0`) gets suff
 
 GPS subjects are only published when the GPS reader is enabled and has a fix (`fix_quality > 0`). If `/gps` returns 404 (GPS reader disabled), it is silently skipped.
 
+## Commands (Subscribed)
+
+The connector subscribes to command subjects with a wildcard source (`**`) so it receives commands from any source (gamepad, autonomy, UI, etc.).
+
+| Subject                | Protobuf Type       | Handling                                                       |
+| ---------------------- | ------------------- | -------------------------------------------------------------- |
+| `cmd_manual_control`   | `TimestampedString` | JSON `{"steering":N,"throttle":N}`, fed into CommandMux        |
+| `cmd_arm`              | `TimestampedBool`   | `true` → POST `/command/arm`, `false` → POST `/command/disarm` |
+| `cmd_set_mode`         | `TimestampedString` | Mode name/number → POST `/command/set_mode`                    |
+| `cmd_active_source`    | `TimestampedString` | Manual override of active mux source                           |
+
+The CommandMux applies priority-based arbitration to `cmd_manual_control` — the source ID from the key (e.g. `gamepad/0`) determines priority. Higher-priority sources preempt lower ones. If a source stops publishing, it times out (default 0.5s for gamepad) and falls through.
+
+The mux publishes the currently active source to `active_command_source/{source_id}/mux`.
+
+`cmd_arm` and `cmd_set_mode` bypass the mux and are queued for immediate forwarding.
+
 ### Example Zenoh Key Paths
 
 With `-r rise -e ssrs18 -s blueos/0`:
@@ -82,8 +109,10 @@ python bin/main.py \
 | `-r` / `--realm`     | yes      |         | Keelson realm                                          |
 | `-e` / `--entity-id` | yes      |         | Entity (vessel) ID                                     |
 | `-s` / `--source-id` | yes      |         | Base source ID (suffixed with `/autopilot` and `/gps`) |
-| `--blueos-url`       | yes      |         | blueos-gateway base URL                              |
-| `--poll-interval`    | no       | `1.0`   | Seconds between polls                                  |
+| `--blueos-url`       | yes      |         | blueos-gateway base URL                                |
+| `--poll-interval`    | no       | `1.0`   | Seconds between telemetry polls                        |
+| `--command-timeout`  | no       | `2.0`   | Default source timeout for command mux (seconds)       |
+| `--forward-interval` | no       | `0.1`   | Interval for forwarding commands to gateway (seconds)  |
 | `--connect`          | no       |         | Zenoh router endpoint(s)                               |
 | `--mode`             | no       |         | Zenoh session mode (`peer` / `client`)                 |
 | `--log-level`        | no       | `20`    | Python log level (`10`=DEBUG, `20`=INFO, `30`=WARNING) |
@@ -101,7 +130,7 @@ Edit `docker-compose.yml` to configure realm, entity, source ID, BlueOS URL, and
 1. Start the blueos-gateway (or a mock returning JSON on `/status` and `/gps`)
 2. Start a Zenoh router:
    ```bash
-   docker run --rm -p 7447:7447 eclipse/zenoh:1.3.3
+   docker run --rm -p 7447:7447 eclipse/zenoh:1.7.2
    ```
 3. Run the connector:
    ```bash

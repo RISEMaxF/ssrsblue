@@ -91,19 +91,22 @@ def run_loop(args, session):
                     last_arm_toggle_time = now
                 prev_start = start_pressed
 
-                # Publish on value change or heartbeat every 0.3s
+                # Publish on value change or heartbeat every 0.2s
                 changed = (steering != last_steering or throttle != last_throttle)
                 elapsed = now - last_command_time
-                if changed or elapsed >= 0.3:
+                if changed or elapsed >= 0.2:
                     logger.debug("throttle=%d steering=%d (ly=%.2f rx=%.2f lx=%.2f ry=%.2f lt=%.2f rt=%.2f armed=%s)",
                                  throttle, steering, state.left_y, state.right_x,
                                  state.left_x, state.right_y, state.left_trigger, state.right_trigger, armed)
 
                     ts = time.time_ns()
-                    publish_command(session, args.realm, args.entity_id,
-                                   args.source_id, steering, throttle, ts)
-                    publish_telemetry(session, args.realm, args.entity_id,
-                                     args.source_id, steering, throttle, ts)
+                    try:
+                        publish_command(session, args.realm, args.entity_id,
+                                       args.source_id, steering, throttle, ts)
+                        publish_telemetry(session, args.realm, args.entity_id,
+                                         args.source_id, steering, throttle, ts)
+                    except Exception as exc:
+                        logger.warning("Zenoh publish failed: %s", exc)
                     last_command_time = now
                     last_steering = steering
                     last_throttle = throttle

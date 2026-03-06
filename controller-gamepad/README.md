@@ -31,6 +31,31 @@ USB Gamepad        controller-gamepad              Zenoh Bus
 | Right stick X | Steering   | -1000 to 1000 | Right positive          |
 | Start button  | Arm/Disarm | bool          | Toggle with 1s cooldown |
 
+## Zenoh Topics
+
+All topics follow the keelson key structure:
+
+```
+{realm}/@v0/{entity_id}/pubsub/{subject}/{source_id}
+```
+
+With the default config (`-r rise -e ssrs18 -s gamepad/0`), the gamepad publishes:
+
+| Full key                                                       | Subject                | Payload              | Description                    |
+| -------------------------------------------------------------- | ---------------------- | -------------------- | ------------------------------ |
+| `rise/@v0/ssrs18/pubsub/cmd_manual_control/gamepad/0`          | `cmd_manual_control`   | TimestampedString    | JSON `{"steering":N,"throttle":N}`, range -1000..1000 |
+| `rise/@v0/ssrs18/pubsub/cmd_arm/gamepad/0`                     | `cmd_arm`              | TimestampedBool      | `true` = arm, `false` = disarm |
+| `rise/@v0/ssrs18/pubsub/rudder_angle_deg/gamepad/0`            | `rudder_angle_deg`     | TimestampedFloat     | Steering / 10 (telemetry)      |
+| `rise/@v0/ssrs18/pubsub/engine_throttle_pct/gamepad/0`         | `engine_throttle_pct`  | TimestampedFloat     | Throttle / 10 (telemetry)      |
+
+The keelson-connector-blueos subscribes to these with a wildcard source (`**`) and routes them:
+
+- **`cmd_manual_control`** — fed into the CommandMux priority arbitration, then forwarded to the gateway at `--forward-interval`
+- **`cmd_arm`** — bypasses the mux, forwarded directly to `/command/arm` or `/command/disarm`
+- **`rudder_angle_deg`** / **`engine_throttle_pct`** — telemetry for recording, not consumed by the connector
+
+All payloads are keelson-enveloped protobuf (the `enclose()` wrapper adds framing and a schema tag).
+
 ## Supported Gamepads
 
 | Gamepad       | `--gamepad` value | USB ID      | Notes                      |

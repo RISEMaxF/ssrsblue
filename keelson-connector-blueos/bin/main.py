@@ -19,6 +19,7 @@ import json
 import time
 import logging
 import argparse
+import queue
 import threading
 
 import zenoh
@@ -188,12 +189,27 @@ def publish_gps(session, realm, entity_id, source_id, data, ts):
 
 
 def forward_commands(mux, base_url, session, realm, entity_id, source_id,
-                     interval, stop_event):
-    """Background thread: forwards active mux command to connector REST API."""
+                     interval, stop_event, direct_queue):
+    """Background thread: forwards mux commands and queued direct commands."""
     mux_src = f"{source_id}/mux"
     last_active = None
+    http_timeout = 0.2
 
     while not stop_event.is_set():
+        # Process queued direct commands (arm, set_mode) first
+        while True:
+            try:
+                endpoint, payload = direct_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                kwargs = {"timeout": http_timeout}
+                if payload is not None:
+                    kwargs["json"] = payload
+                requests.post(f"{base_url}{endpoint}", **kwargs)
+            except requests.RequestException as exc:
+                logger.warning("Forward %s failed: %s", endpoint, exc)
+
         result = mux.get_active_command()
 
         if result:
@@ -202,7 +218,7 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
                 requests.post(
                     f"{base_url}/command/manual_control",
                     json={"steering": steering, "throttle": throttle},
-                    timeout=1,
+                    timeout=http_timeout,
                 )
             except requests.RequestException as exc:
                 logger.warning("Forward manual_control failed: %s", exc)
@@ -215,14 +231,11 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
                 last_active = active_id
 
         elif last_active is not None:
-            # All sources timed out — send neutral once and clear active.
-            # Only sent once per transition; the connector's own watchdog
-            # handles sustained command loss independently.
             try:
                 requests.post(
                     f"{base_url}/command/manual_control",
                     json={"steering": 0, "throttle": 0},
-                    timeout=1,
+                    timeout=http_timeout,
                 )
             except requests.RequestException as exc:
                 logger.warning("Forward neutral failed: %s", exc)
@@ -236,7 +249,7 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
         stop_event.wait(interval)
 
 
-def setup_command_subscribers(session, mux, realm, entity_id, base_url):
+def setup_command_subscribers(session, mux, realm, entity_id, direct_queue):
     """Subscribe to command subjects and wire callbacks to the mux."""
     # Key prefix for extracting source_id from received keys
     prefix = f"{realm}/@v0/{entity_id}/pubsub/"
@@ -254,7 +267,7 @@ def setup_command_subscribers(session, mux, realm, entity_id, base_url):
         except Exception as exc:
             logger.warning("cmd_manual_control error: %s", exc)
 
-    # cmd_set_mode — bypasses priority, forwards directly
+    # cmd_set_mode — bypasses priority, queued for forward thread
     def on_set_mode(sample):
         try:
             _, _, payload = keelson.uncover(bytes(sample.payload))
@@ -262,12 +275,11 @@ def setup_command_subscribers(session, mux, realm, entity_id, base_url):
             msg.ParseFromString(payload)
             mode = msg.value
             logger.info("cmd_set_mode: %s", mode)
-            requests.post(f"{base_url}/command/set_mode",
-                          json={"mode": mode}, timeout=2)
+            direct_queue.put_nowait(("/command/set_mode", {"mode": mode}))
         except Exception as exc:
             logger.warning("cmd_set_mode error: %s", exc)
 
-    # cmd_arm — bypasses priority, forwards directly
+    # cmd_arm — bypasses priority, queued for forward thread
     def on_arm(sample):
         try:
             _, _, payload = keelson.uncover(bytes(sample.payload))
@@ -276,7 +288,7 @@ def setup_command_subscribers(session, mux, realm, entity_id, base_url):
             arm = msg.value
             endpoint = "arm" if arm else "disarm"
             logger.info("cmd_arm: %s", endpoint)
-            requests.post(f"{base_url}/command/{endpoint}", timeout=2)
+            direct_queue.put_nowait((f"/command/{endpoint}", None))
         except Exception as exc:
             logger.warning("cmd_arm error: %s", exc)
 
@@ -358,10 +370,11 @@ def main():
     with zenoh.open(conf) as session:
         logger.info("Zenoh session opened")
 
-        # Command mux + subscribers
+        # Command mux + direct command queue
         mux = CommandMux(default_timeout=args.command_timeout)
+        direct_queue = queue.Queue(maxsize=64)
         subscribers = setup_command_subscribers(
-            session, mux, args.realm, args.entity_id, base_url,
+            session, mux, args.realm, args.entity_id, direct_queue,
         )
 
         # Command forwarding thread
@@ -369,7 +382,8 @@ def main():
         fwd_thread = threading.Thread(
             target=forward_commands,
             args=(mux, base_url, session, args.realm, args.entity_id,
-                  args.source_id, args.forward_interval, stop_event),
+                  args.source_id, args.forward_interval, stop_event,
+                  direct_queue),
             daemon=True,
         )
         fwd_thread.start()

@@ -8,7 +8,7 @@ from blueos_gateway.models import (
     ManualControlRequest,
     SetModeRequest,
 )
-from blueos_gateway.validators import is_controllable_mode, validate_mode
+from blueos_gateway.validators import validate_mode
 from blueos_gateway.vehicle_state import ROVER_MODES
 
 router = APIRouter(prefix="/command", tags=["commands"])
@@ -29,14 +29,6 @@ def _require_guided(request: Request) -> None:
     if not s.armed:
         raise HTTPException(400, "Vehicle not armed")
 
-
-def _require_controllable(request: Request) -> None:
-    _require_connected(request)
-    s = request.app.state.vehicle_state
-    if not is_controllable_mode(s.mode):
-        raise HTTPException(
-            400, f"Vehicle in {s.mode_name} mode, need STEERING or GUIDED"
-        )
 
 
 @router.post("/manual_control", response_model=CommandResponse)

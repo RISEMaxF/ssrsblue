@@ -68,7 +68,11 @@ class LogitechF310(Gamepad):
             self._dev.set_configuration()
         except usb.core.USBError:
             pass
-        usb.util.claim_interface(self._dev, 0)
+        try:
+            usb.util.claim_interface(self._dev, 0)
+        except usb.core.USBError as exc:
+            self._dev = None
+            raise RuntimeError(f"Cannot claim USB interface (device busy?): {exc}") from exc
         logger.info("Logitech F310 opened")
 
     def close(self):
@@ -90,6 +94,7 @@ class LogitechF310(Gamepad):
             raise
 
         if len(data) < 14:
+            logger.debug("Partial USB read (%d bytes), using last state", len(data))
             return self._last_state
 
         btn_lo = data[2]
