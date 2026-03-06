@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import signal
 import time
 import logging
 import argparse
@@ -157,6 +158,11 @@ def main():
         args.realm, args.entity_id, args.source_id,
         args.gamepad, args.poll_interval,
     )
+
+    # Raise KeyboardInterrupt on SIGTERM so finally blocks run on docker stop
+    def _sigterm_handler(signum, frame):
+        raise KeyboardInterrupt()
+    signal.signal(signal.SIGTERM, _sigterm_handler)
 
     conf = zenoh.Config()
     if args.mode:

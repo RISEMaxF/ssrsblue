@@ -16,6 +16,7 @@ Bidirectional bridge between the BlueOS connector REST API and keelson/Zenoh:
 """
 
 import json
+import signal
 import time
 import logging
 import argparse
@@ -367,6 +368,11 @@ def main():
         args.poll_interval, args.forward_interval,
     )
 
+    # Raise KeyboardInterrupt on SIGTERM so finally blocks run on docker stop
+    def _sigterm_handler(signum, frame):
+        raise KeyboardInterrupt()
+    signal.signal(signal.SIGTERM, _sigterm_handler)
+
     with zenoh.open(conf) as session:
         logger.info("Zenoh session opened")
 
@@ -391,7 +397,7 @@ def main():
                      args.forward_interval, args.command_timeout)
 
         try:
-            # Telemetry polling loop (unchanged)
+            # Telemetry polling loop
             while True:
                 ts = time.time_ns()
 

@@ -13,3 +13,9 @@ services:
       - CONNECTOR_LOG_LEVEL=INFO
       # GPS serial reader disabled (no USB GPS dongle yet)
       - CONNECTOR_GPS_SERIAL_PORT=
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
