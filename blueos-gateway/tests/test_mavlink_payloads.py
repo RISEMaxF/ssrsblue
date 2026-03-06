@@ -65,7 +65,7 @@ class TestManualControlPayload:
     def test_system_id_from_config(self):
         client = _make_client()
         payload = client._build_manual_control(steering=0, throttle=0)
-        assert payload["header"]["system_id"] == 254
+        assert payload["header"]["system_id"] == 255
 
 
 class TestSetModePayload:
@@ -186,7 +186,7 @@ class TestHeartbeatPayload:
     def test_system_id(self):
         client = _make_client()
         payload = client._build_heartbeat()
-        assert payload["header"]["system_id"] == 254
+        assert payload["header"]["system_id"] == 255
 
 
 class TestCommandAckRouting:

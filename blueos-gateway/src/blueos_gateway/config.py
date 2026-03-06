@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # The vessel uses 192.168.1.248 (Teltonika router network), not the
     # BlueOS default 192.168.2.2 DHCP range.
     blueos_host: str = "192.168.2.2"
-    system_id: int = 254
+    system_id: int = 255
     target_system: int = 1
     target_component: int = 1
     watchdog_timeout: float = 2.0
