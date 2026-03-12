@@ -61,12 +61,15 @@ end
 
 gcs:send_text(6, string.format("motor_mixer: channels=%d/%d/%d", chan1, chan2, chan3))
 
--- Try to find the RC switch assigned to Scripting1 (RCx_OPTION=300)
+-- RC switch — re-resolved periodically so late-connecting receivers work
 local rc_switch = rc:find_channel_for_option(300)
+local rc_switch_last_check = 0
+local RC_SWITCH_CHECK_INTERVAL_MS = 5000  -- re-check every 5s if not found
+
 if rc_switch then
     gcs:send_text(6, "motor_mixer: RC switch found for mode select")
 else
-    gcs:send_text(5, "motor_mixer: No RC switch (RCx_OPTION=300), using SCR_USER1 only")
+    gcs:send_text(5, "motor_mixer: No RC switch (RCx_OPTION=300), will keep checking")
 end
 
 -- Cache SCR_USER1 parameter object for fast reads
@@ -90,6 +93,18 @@ local function set_output(chan, norm_value)
 end
 
 local function get_motor_mode()
+    -- Re-resolve RC switch periodically if not yet found
+    if not rc_switch then
+        local now = millis():tofloat()
+        if now - rc_switch_last_check >= RC_SWITCH_CHECK_INTERVAL_MS then
+            rc_switch_last_check = now
+            rc_switch = rc:find_channel_for_option(300)
+            if rc_switch then
+                gcs:send_text(6, "motor_mixer: RC switch found (late connect)")
+            end
+        end
+    end
+
     -- RC switch takes priority if assigned (all positions are meaningful)
     if rc_switch then
         local pos = rc_switch:get_aux_switch_pos()
