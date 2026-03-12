@@ -47,7 +47,7 @@ local user_mode = Parameter('SCR_USER1')
 local last_mode = -1
 
 local function get_motor_mode()
-    -- RC switch takes priority if assigned and not at low (default) position
+    -- RC switch takes priority if assigned (all positions are meaningful)
     if rc_switch then
         local pos = rc_switch:get_aux_switch_pos()
         if pos == 0 then
@@ -93,6 +93,10 @@ local function update()
     local steering = vehicle:get_control_output(CONTROL_YAW)
 
     if not throttle or not steering then
+        -- Zero outputs if control data unavailable (e.g. during init)
+        SRV_Channels:set_output_norm(K_SCRIPT1, 0)
+        SRV_Channels:set_output_norm(K_SCRIPT2, 0)
+        SRV_Channels:set_output_norm(K_SCRIPT3, 0)
         return update, 20
     end
 
@@ -119,9 +123,14 @@ local function update()
         flipsky = throttle
     end
 
-    -- Clamp outputs to [-1, 1]
-    left = math.max(-1, math.min(1, left))
-    right = math.max(-1, math.min(1, right))
+    -- Scale left/right pair proportionally to preserve steering balance
+    local skid_max = math.max(math.abs(left), math.abs(right))
+    if skid_max > 1 then
+        left = left / skid_max
+        right = right / skid_max
+    end
+
+    -- Clamp flipsky independently (it's a separate motor group)
     flipsky = math.max(-1, math.min(1, flipsky))
 
     SRV_Channels:set_output_norm(K_SCRIPT1, left)
