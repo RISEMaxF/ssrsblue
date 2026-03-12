@@ -15,6 +15,13 @@ class ManualControlRequest(BaseModel):
     )
 
 
+class MotorModeRequest(BaseModel):
+    mode: str = Field(
+        ...,
+        description="Motor mode: 'blue_robotics', 'all', or 'flipsky'",
+    )
+
+
 class SetModeRequest(BaseModel):
     mode: str | int = Field(..., description="Mode name (MANUAL, GUIDED, …) or number")
 

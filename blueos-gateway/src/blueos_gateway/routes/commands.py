@@ -6,6 +6,7 @@ from blueos_gateway.models import (
     GuidedPositionRequest,
     GuidedVelocityRequest,
     ManualControlRequest,
+    MotorModeRequest,
     SetModeRequest,
 )
 from blueos_gateway.validators import validate_mode
@@ -29,6 +30,32 @@ def _require_guided(request: Request) -> None:
     if not s.armed:
         raise HTTPException(400, "Vehicle not armed")
 
+
+
+MOTOR_MODE_MAP = {
+    "blue_robotics": 0,
+    "all": 1,
+    "flipsky": 2,
+}
+
+
+@router.post("/motor_mode", response_model=CommandResponse)
+async def motor_mode(
+    req: MotorModeRequest, request: Request
+) -> CommandResponse:
+    _require_connected(request)
+    mode_str = req.mode.lower()
+    if mode_str not in MOTOR_MODE_MAP:
+        raise HTTPException(
+            400, f"Invalid mode '{req.mode}'. Use: {list(MOTOR_MODE_MAP.keys())}"
+        )
+    client = request.app.state.mavlink_client
+    value = float(MOTOR_MODE_MAP[mode_str])
+    ok = await client.send_param_set("SCR_USER1", value)
+    return CommandResponse(
+        success=ok,
+        message=f"Motor mode set to {mode_str}" if ok else "Send failed",
+    )
 
 
 @router.post("/manual_control", response_model=CommandResponse)

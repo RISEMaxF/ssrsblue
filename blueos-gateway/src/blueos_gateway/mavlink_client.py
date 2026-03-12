@@ -211,6 +211,19 @@ class MAVLinkClient:
             },
         }
 
+    def _build_param_set(self, param_id: str, value: float) -> dict:
+        return {
+            "header": self._header(),
+            "message": {
+                "type": "PARAM_SET",
+                "target_system": self.config.target_system,
+                "target_component": self.config.target_component,
+                "param_id": param_id,
+                "param_value": value,
+                "param_type": {"type": "MAV_PARAM_TYPE_REAL32"},
+            },
+        }
+
     def _build_arm_disarm(self, arm: bool) -> dict:
         return {
             "header": self._header(),
@@ -350,6 +363,11 @@ class MAVLinkClient:
 
     async def send_arm(self, arm: bool) -> CommandResult:
         return await self._send_command_long(self._build_arm_disarm(arm))
+
+    async def send_param_set(self, param_id: str, value: float) -> bool:
+        return await self.send_message(
+            self._build_param_set(param_id, value)
+        )
 
     async def send_guided_position(self, lat: float, lon: float) -> bool:
         ok = await self.send_message(self._build_guided_position(lat, lon))
