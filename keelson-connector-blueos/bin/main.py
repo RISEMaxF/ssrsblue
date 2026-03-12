@@ -232,6 +232,10 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
                 last_active = active_id
 
         elif last_active is not None:
+            # All sources timed out — send ONE neutral command, then stop.
+            # Do NOT keep sending MANUAL_CONTROL(0,0) continuously, as that
+            # prevents RC_OVERRIDE_TIME from expiring and blocks the RC
+            # transmitter from regaining steer/throttle control.
             try:
                 requests.post(
                     f"{base_url}/command/manual_control",
@@ -246,6 +250,7 @@ def forward_commands(mux, base_url, session, realm, entity_id, source_id,
                     "active_command_source", mux_src,
                     enclose_from_string("", ts))
             last_active = None
+            logger.info("All command sources timed out, stopped sending MANUAL_CONTROL")
 
         stop_event.wait(interval)
 

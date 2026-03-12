@@ -70,7 +70,7 @@ motor_mixer: No RC switch (RCx_OPTION=300), using SCR_USER1 only
 ### Safety
 
 - All outputs are zeroed when disarmed
-- If the script crashes, servo outputs freeze at last PWM value — ArduPilot's own failsafe still applies
+- If the script crashes, servo outputs revert to trim (neutral, 1500μs) within 100ms via `set_output_pwm_chan_timeout`
 - RC aux switch takes priority over software mode selection
 - Default mode (no RC switch, SCR_USER1=0) is `blue_robotics` (safest — no Flipsky)
 

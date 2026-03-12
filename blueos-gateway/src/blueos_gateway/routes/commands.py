@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 
 from blueos_gateway.models import (
@@ -11,6 +13,8 @@ from blueos_gateway.models import (
 )
 from blueos_gateway.validators import validate_mode
 from blueos_gateway.vehicle_state import ROVER_MODES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/command", tags=["commands"])
 
@@ -52,6 +56,7 @@ async def motor_mode(
     client = request.app.state.mavlink_client
     value = float(MOTOR_MODE_MAP[mode_str])
     ok = await client.send_param_set("SCR_USER1", value)
+    logger.info("Motor mode change: %s (SCR_USER1=%.0f), send=%s", mode_str, value, ok)
     return CommandResponse(
         success=ok,
         message=f"Motor mode set to {mode_str}" if ok else "Send failed",

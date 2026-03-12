@@ -74,8 +74,9 @@ local user_mode = Parameter('SCR_USER1')
 
 local last_mode = -1
 
--- Convert normalized value (-1..1) to PWM
+-- Convert normalized value (-1..1) to PWM (with defensive clamp)
 local function norm_to_pwm(value)
+    value = math.max(-1, math.min(1, value))
     if value >= 0 then
         return math.floor(PWM_TRIM + value * (PWM_MAX - PWM_TRIM) + 0.5)
     else
@@ -96,9 +97,10 @@ local function get_motor_mode()
             return MODE_BLUE
         elseif pos == 1 then
             return MODE_ALL
-        else
+        elseif pos == 2 then
             return MODE_FLIPSKY
         end
+        -- pos is nil (RC link lost) — fall through to SCR_USER1 or default
     end
 
     -- Fallback to SCR_USER1
@@ -134,8 +136,9 @@ local function update()
     local throttle = vehicle:get_control_output(CONTROL_THROTTLE)
     local steering = vehicle:get_control_output(CONTROL_YAW)
 
-    if not throttle or not steering then
-        -- Zero outputs if control data unavailable (e.g. during init)
+    if not throttle or not steering
+       or throttle ~= throttle or steering ~= steering then
+        -- Zero outputs if control data unavailable or NaN
         set_output(chan1, 0)
         set_output(chan2, 0)
         set_output(chan3, 0)

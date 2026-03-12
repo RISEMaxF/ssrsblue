@@ -99,7 +99,7 @@ class VehicleState:
     def update_from_param_value(self, msg: dict) -> None:
         param_id = msg.get("param_id", "")
         if param_id == "SCR_USER1":
-            value = int(msg.get("param_value", 0))
+            value = round(msg.get("param_value", 0))
             self.motor_mode = _MOTOR_MODE_NAMES.get(value)
 
 
