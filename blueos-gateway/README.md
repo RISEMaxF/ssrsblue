@@ -99,6 +99,13 @@ curl -X POST http://localhost:8080/command/arm
 curl -X POST http://localhost:8080/command/disarm
 # → {"success": true, "message": "Disarmed", "ack_result": "MAV_RESULT_ACCEPTED"}
 
+# Motor mode (sets SCR_USER1 on ArduPilot for Lua motor mixer)
+curl -X POST http://localhost:8080/command/motor_mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "all"}'
+# → {"success": true, "message": "Motor mode set to all", "ack_result": null}
+# Valid modes: "blue_robotics", "all", "flipsky"
+
 # GUIDED: go to position
 curl -X POST http://localhost:8080/command/guided/position \
   -H "Content-Type: application/json" \
@@ -144,7 +151,7 @@ curl -X POST http://localhost:8080/command/set_mode \
 # → {"success": false, "message": "HOLD rejected: TIMEOUT", "ack_result": "TIMEOUT"}
 ```
 
-Fire-and-forget commands (`manual_control`, `guided/*`) return `ack_result: null` — they don't use COMMAND_LONG and ArduPilot doesn't ACK them.
+Fire-and-forget commands (`manual_control`, `motor_mode`, `guided/*`) return `ack_result: null` — they don't use COMMAND_LONG and ArduPilot doesn't ACK them.
 
 ### Status
 
@@ -227,16 +234,16 @@ Example responses:
 
 All via environment variables (prefix `CONNECTOR_`):
 
-| Variable                     | Default       | Description                                     |
-| ---------------------------- | ------------- | ----------------------------------------------- |
-| `CONNECTOR_BLUEOS_HOST`      | `192.168.2.2` | BlueOS IP or hostname                           |
-| `CONNECTOR_SYSTEM_ID`        | `254`         | MAVLink system ID (avoid 255 if QGC is running) |
-| `CONNECTOR_WATCHDOG_TIMEOUT` | `2.0`         | Seconds before watchdog sends neutral           |
-| `CONNECTOR_LOG_LEVEL`        | `INFO`        | Python log level                                |
-| `CONNECTOR_GPS_SERIAL_PORT`  | `""`          | Serial port for USB GPS (empty = disabled)      |
-| `CONNECTOR_GPS_SERIAL_BAUD`  | `9600`        | GPS baud rate                                   |
-| `CONNECTOR_GPS_UDP_HOST`     | `192.168.2.2` | BlueOS IP for NMEA Injector                     |
-| `CONNECTOR_GPS_UDP_PORT`     | `27000`       | UDP port for NMEA Injector                      |
+| Variable                     | Default       | Description                                |
+| ---------------------------- | ------------- | ------------------------------------------ |
+| `CONNECTOR_BLUEOS_HOST`      | `192.168.2.2` | BlueOS IP or hostname                      |
+| `CONNECTOR_SYSTEM_ID`        | `255`         | MAVLink system ID (must match SYSID_MYGCS) |
+| `CONNECTOR_WATCHDOG_TIMEOUT` | `2.0`         | Seconds before watchdog sends neutral      |
+| `CONNECTOR_LOG_LEVEL`        | `INFO`        | Python log level                           |
+| `CONNECTOR_GPS_SERIAL_PORT`  | `""`          | Serial port for USB GPS (empty = disabled) |
+| `CONNECTOR_GPS_SERIAL_BAUD`  | `9600`        | GPS baud rate                              |
+| `CONNECTOR_GPS_UDP_HOST`     | `192.168.2.2` | BlueOS IP for NMEA Injector                |
+| `CONNECTOR_GPS_UDP_PORT`     | `27000`       | UDP port for NMEA Injector                 |
 
 ## GPS serial reader
 
@@ -274,7 +281,7 @@ From [ArduPilot Rover Commands](https://ardupilot.org/dev/docs/mavlink-rover-com
 - **Watchdog**: Sends neutral (steering=0, throttle=0) if no commands arrive for 2s while armed in GUIDED/STEERING. Kicks in before ArduRover's own 3s `RC_OVERRIDE_TIME`.
 - **Mode gating**: GUIDED position/velocity/heading commands are rejected with HTTP 400 if the vehicle isn't in GUIDED mode or isn't armed.
 - **Input validation**: All values clamped to valid ranges. Pydantic rejects out-of-range inputs with HTTP 422.
-- **Pilot override**: The RC controller always wins. `MODE_CH` on the RC determines the active mode. The companion cannot override the pilot's mode switch.
+- **Pilot override**: The RC controller always wins for mode selection (`MODE_CH`). MANUAL_CONTROL only overrides steer+throttle channels — RC aux channels (motor mode switch, etc.) remain active. RC regains steering/throttle within `RC_OVERRIDE_TIME` (default 3s) if the gamepad stops.
 - **Heartbeats**: Sent at 1 Hz. If the gateway dies, ArduPilot's GCS failsafe triggers after `FS_GCS_TIMEOUT` (default 5s).
 
 ## Project structure

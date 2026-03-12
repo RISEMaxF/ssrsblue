@@ -21,7 +21,10 @@ graph LR
             GC[controller-gamepad<br/>Gamepad → Zenoh]
         end
 
+        LUA[motor_mixer.lua<br/>on ArduPilot]
+
         RC --->|PWM| BlueOS
+        RC --->|aux switch| LUA
         GPS -.->|serial| Conn
         Gamepad -->|USB| GC
     end
@@ -43,6 +46,7 @@ graph LR
     end
 
     Conn <-->|MAVLink via<br/>HTTP + WebSocket| BlueOS
+    LUA -->|servo outputs| BlueOS
     KC -->|GET /status<br/>GET /gps| Conn
     KC -->|POST commands| Conn
     KC -->|publish telemetry| Telemetry
@@ -101,6 +105,37 @@ Mode changes (`cmd_set_mode`) and arm/disarm (`cmd_arm`) bypass priority — any
 | `cmd_arm`               | `TimestampedBool`   | true=arm, false=disarm                        |
 | `cmd_active_source`     | `TimestampedString` | Force a specific source (manual override)     |
 | `active_command_source` | `TimestampedString` | Published by mux: current active source       |
+
+## Motor Mixing (Lua Script)
+
+The vessel has 3 motors: 2x Blue Robotics thrusters (skid steering) and 1x Flipsky thruster (forward boost). A Lua script (`ardupilot-scripts/motor_mixer.lua`) runs on ArduPilot at 50Hz and handles mixing.
+
+**Motor modes** (selected by RC aux switch or software API):
+
+| Mode            | Blue Robotics L/R   | Flipsky     | Use case              |
+| --------------- | ------------------- | ----------- | --------------------- |
+| `blue_robotics` | Skid steering (T±S) | Off         | Maneuvering           |
+| `all`           | Skid steering (T±S) | Forward (T) | Full power + steering |
+| `flipsky`       | Off                 | Forward (T) | Cruising, no steering |
+
+**Mode selection priority:**
+
+1. **RC aux switch** (`RCx_OPTION=300`) — physical, always wins. Low/Mid/High = blue_robotics/all/flipsky.
+2. **Gateway API** (`POST /command/motor_mode`) — sets `SCR_USER1` via MAVLink PARAM_SET.
+
+The gamepad doesn't know about motors — it just sends steering + throttle. ArduPilot processes it normally, and the Lua script distributes the output.
+
+### ArduPilot Parameters
+
+```
+SCR_ENABLE       = 1
+SERVO1_FUNCTION  = 94  (Script1 → Blue Robotics Left)
+SERVO2_FUNCTION  = 95  (Script2 → Blue Robotics Right)
+SERVO3_FUNCTION  = 96  (Script3 → Flipsky)
+RCx_OPTION       = 300 (Scripting1 — aux switch for mode)
+```
+
+Upload the script via BlueOS File Browser → `configs/ardupilot-manager/firmware/scripts/motor_mixer.lua`
 
 ## Containers
 
@@ -173,6 +208,7 @@ BlueOS exposes MAVLink2REST at `http://192.168.1.248/mavlink2rest`. The gateway 
 
 - **Command mux timeout**: if a command source stops publishing, the mux falls through to lower-priority sources; if all time out, neutral (0,0) is sent
 - **Gamepad disconnect**: controller publishes neutral immediately, then mux timeout provides backup
-- **Pilot override**: RC controller always wins via ArduRover's mode channel
+- **Pilot override**: RC controller aux channels remain active even while the gamepad sends MANUAL_CONTROL (only steer/throttle are overridden). RC takes back steering/throttle within `RC_OVERRIDE_TIME` (default 3s) if the gamepad stops.
+- **Motor mode switch**: RC aux switch (`RCx_OPTION=300`) always overrides software motor mode selection.
 - **GCS failsafe**: if blueos-gateway dies, ArduPilot triggers failsafe after 5s (no heartbeats)
 - **Watchdog**: blueos-gateway sends neutral steering+throttle if no commands arrive for 2s while armed
