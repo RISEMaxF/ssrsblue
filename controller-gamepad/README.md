@@ -41,12 +41,12 @@ All topics follow the keelson key structure:
 
 With the default config (`-r rise -e ssrs18 -s gamepad/0`), the gamepad publishes:
 
-| Full key                                                       | Subject                | Payload              | Description                    |
-| -------------------------------------------------------------- | ---------------------- | -------------------- | ------------------------------ |
-| `rise/@v0/ssrs18/pubsub/cmd_manual_control/gamepad/0`          | `cmd_manual_control`   | TimestampedString    | JSON `{"steering":N,"throttle":N}`, range -1000..1000 |
-| `rise/@v0/ssrs18/pubsub/cmd_arm/gamepad/0`                     | `cmd_arm`              | TimestampedBool      | `true` = arm, `false` = disarm |
-| `rise/@v0/ssrs18/pubsub/rudder_angle_deg/gamepad/0`            | `rudder_angle_deg`     | TimestampedFloat     | Steering / 10 (telemetry)      |
-| `rise/@v0/ssrs18/pubsub/engine_throttle_pct/gamepad/0`         | `engine_throttle_pct`  | TimestampedFloat     | Throttle / 10 (telemetry)      |
+| Full key                                               | Subject               | Payload           | Description                                           |
+| ------------------------------------------------------ | --------------------- | ----------------- | ----------------------------------------------------- |
+| `rise/@v0/ssrs18/pubsub/cmd_manual_control/gamepad/0`  | `cmd_manual_control`  | TimestampedString | JSON `{"steering":N,"throttle":N}`, range -1000..1000 |
+| `rise/@v0/ssrs18/pubsub/cmd_arm/gamepad/0`             | `cmd_arm`             | TimestampedBool   | `true` = arm, `false` = disarm                        |
+| `rise/@v0/ssrs18/pubsub/rudder_angle_deg/gamepad/0`    | `rudder_angle_deg`    | TimestampedFloat  | Steering / 10 (telemetry)                             |
+| `rise/@v0/ssrs18/pubsub/engine_throttle_pct/gamepad/0` | `engine_throttle_pct` | TimestampedFloat  | Throttle / 10 (telemetry)                             |
 
 The keelson-connector-blueos subscribes to these with a wildcard source (`**`) and routes them:
 

@@ -32,6 +32,7 @@
 BlueOS is Blue Robotics' open-source onboard computer OS for marine vehicles (ROVs, AUVs, USVs). It is the **companion computer software** -- it does NOT run the flight controller firmware itself. Instead, it manages ArduPilot (ArduSub/ArduRover/etc.), video streams, network, and extensions.
 
 **Key facts:**
+
 - Successor to the legacy "Companion" software
 - Docker-based microservice architecture
 - Web UI at `http://192.168.2.2` (or `http://blueos.local`)
@@ -40,6 +41,7 @@ BlueOS is Blue Robotics' open-source onboard computer OS for marine vehicles (RO
 - Extensible via Docker container extensions
 
 **Version 1.4.3** (your version) includes:
+
 - Safe Mode to prevent unsafe config while armed
 - Improved `register_service` for cross-extension communication
 - MAVLink Server as a routing alternative with all-endpoint logging
@@ -79,20 +81,20 @@ BlueOS is Blue Robotics' open-source onboard computer OS for marine vehicles (RO
 
 ### Service Endpoints
 
-| Service | Port | Base URL |
-|---------|------|----------|
-| Autopilot Manager | 8000 | `/ardupilot-manager/v1.0` |
-| MAVLink2REST | 6040 | `/mavlink2rest` |
-| Video Manager | 6020 | `/mavlink-camera-manager` |
-| Cable Guy (network) | 9090 | `/cable-guy/v1.0` |
-| WiFi Manager | 9000 | `/wifi-manager/v1.0` |
-| System Info | 6030 | `/system-information` |
-| Extensions (Kraken) | 9134 | `/kraken/v1.0` |
-| File Browser | 7777 | `/file-browser` |
-| Terminal | 8088 | direct |
-| Version Chooser | 8081 | `/version-chooser/v1.0` |
-| Commander | - | `/commander/v1.0` |
-| Bag of Holding | 9101 | DB modification utility |
+| Service             | Port | Base URL                  |
+| ------------------- | ---- | ------------------------- |
+| Autopilot Manager   | 8000 | `/ardupilot-manager/v1.0` |
+| MAVLink2REST        | 6040 | `/mavlink2rest`           |
+| Video Manager       | 6020 | `/mavlink-camera-manager` |
+| Cable Guy (network) | 9090 | `/cable-guy/v1.0`         |
+| WiFi Manager        | 9000 | `/wifi-manager/v1.0`      |
+| System Info         | 6030 | `/system-information`     |
+| Extensions (Kraken) | 9134 | `/kraken/v1.0`            |
+| File Browser        | 7777 | `/file-browser`           |
+| Terminal            | 8088 | direct                    |
+| Version Chooser     | 8081 | `/version-chooser/v1.0`   |
+| Commander           | -    | `/commander/v1.0`         |
+| Bag of Holding      | 9101 | DB modification utility   |
 
 Every service has **interactive Swagger docs** at `http://192.168.2.2/{service-path}/docs`.
 
@@ -103,6 +105,7 @@ Enable via the skull icon in the header. Reveals advanced/development features: 
 ### MAVLink Routing (v1.4+)
 
 Three backend options:
+
 1. **MAVLinkRouter** (default) -- standard routing
 2. **MAVP2P** -- higher CPU, recommended if you get "GCS Heartbeat Lost" errors
 3. **MAVLinkServer** (new in 1.4) -- all-endpoint logging, WebSocket support, MAVLink2REST-compatible API
@@ -115,21 +118,21 @@ The Navigator is a **passive HAT** with no onboard MCU or firmware. ArduPilot ru
 
 ### Specifications
 
-| Feature | Detail |
-|---------|--------|
-| PWM outputs | **16 channels**, PCA9685 driver, 1 us resolution at 250 Hz |
-| PWM accuracy | +/-0.5 us at 50, 100, 200, 250, 400, 500 Hz |
-| Signal voltage | 3.3V, 15 mA max per channel |
-| IMU | ICM-20602 (6-axis accel + gyro) on SPI |
-| Magnetometers | MMC5983 + AK09915 (dual 3-axis compass) |
-| Barometer | BMP280 (300-1100 mbar, -900 to 9000m altitude) |
-| ADC | ADS1115 16-bit (14.69 bits effective), 2 ports (3.3V + 6.6V input) |
-| Serial | 4x UART (up to 3 MBd, no flow control) |
-| I2C | 2 ports (10 kHz - 1 MHz), path `/dev/i2c-6` |
-| RC Input | SBUS, Crossfire, IBUS |
-| Leak detection | 2 probes with 5V pull-up |
-| LEDs | RGB NeoPixel |
-| Power | Dual inputs with auto-switching, 4A continuous to Pi |
+| Feature        | Detail                                                             |
+| -------------- | ------------------------------------------------------------------ |
+| PWM outputs    | **16 channels**, PCA9685 driver, 1 us resolution at 250 Hz         |
+| PWM accuracy   | +/-0.5 us at 50, 100, 200, 250, 400, 500 Hz                        |
+| Signal voltage | 3.3V, 15 mA max per channel                                        |
+| IMU            | ICM-20602 (6-axis accel + gyro) on SPI                             |
+| Magnetometers  | MMC5983 + AK09915 (dual 3-axis compass)                            |
+| Barometer      | BMP280 (300-1100 mbar, -900 to 9000m altitude)                     |
+| ADC            | ADS1115 16-bit (14.69 bits effective), 2 ports (3.3V + 6.6V input) |
+| Serial         | 4x UART (up to 3 MBd, no flow control)                             |
+| I2C            | 2 ports (10 kHz - 1 MHz), path `/dev/i2c-6`                        |
+| RC Input       | SBUS, Crossfire, IBUS                                              |
+| Leak detection | 2 probes with 5V pull-up                                           |
+| LEDs           | RGB NeoPixel                                                       |
+| Power          | Dual inputs with auto-switching, 4A continuous to Pi               |
 
 ### I2C/SPI Device Map
 
@@ -150,18 +153,18 @@ Raspberry Pi 4
 
 ### PWM Channel Mapping (typical)
 
-| PCA9685 Ch | ArduPilot SERVO# | Typical Use |
-|------------|-----------------|-------------|
-| 0 | SERVO1 | Thruster 1 |
-| 1 | SERVO2 | Thruster 2 |
-| 2 | SERVO3 | Thruster 3 |
-| 3 | SERVO4 | Thruster 4 |
-| 4 | SERVO5 | Thruster 5 |
-| 5 | SERVO6 | Thruster 6 |
-| 6-7 | SERVO7-8 | Thruster 7-8 (heavy config) |
-| 8 | SERVO9 | Lights |
-| 9 | SERVO10 | Camera tilt servo |
-| 10-15 | SERVO11-16 | Gripper / Aux |
+| PCA9685 Ch | ArduPilot SERVO# | Typical Use                 |
+| ---------- | ---------------- | --------------------------- |
+| 0          | SERVO1           | Thruster 1                  |
+| 1          | SERVO2           | Thruster 2                  |
+| 2          | SERVO3           | Thruster 3                  |
+| 3          | SERVO4           | Thruster 4                  |
+| 4          | SERVO5           | Thruster 5                  |
+| 5          | SERVO6           | Thruster 6                  |
+| 6-7        | SERVO7-8         | Thruster 7-8 (heavy config) |
+| 8          | SERVO9           | Lights                      |
+| 9          | SERVO10          | Camera tilt servo           |
+| 10-15      | SERVO11-16       | Gripper / Aux               |
 
 Channel-to-function mapping is configurable via `SERVOn_FUNCTION` ArduPilot parameters.
 
@@ -169,26 +172,26 @@ Channel-to-function mapping is configurable via `SERVOn_FUNCTION` ArduPilot para
 
 ## 4. Control Methods Compared
 
-| Method | Latency | Setup | ArduPilot Features | Best For |
-|--------|---------|-------|-------------------|----------|
-| **MAVLink2REST (HTTP)** | ~10-50ms | Trivial (just HTTP) | Full | Quick scripting, any language |
-| **MAVLink2REST (WebSocket)** | ~5-15ms | Easy | Full | Web UIs, real-time dashboards |
-| **pymavlink (UDP)** | ~1-5ms | Medium | Full | Low-latency autonomous control |
-| **Direct PWM (navigator-lib)** | ~1ms | Easy (stop ArduPilot) | None | Custom vehicles, raw control |
-| **MAVROS/ROS** | ~5-20ms | Hard (full ROS stack) | Full | ROS-based research |
-| **MAVSDK** | ~5-10ms | Medium | Limited (PX4-focused) | Not recommended for ArduPilot |
+| Method                         | Latency  | Setup                 | ArduPilot Features    | Best For                       |
+| ------------------------------ | -------- | --------------------- | --------------------- | ------------------------------ |
+| **MAVLink2REST (HTTP)**        | ~10-50ms | Trivial (just HTTP)   | Full                  | Quick scripting, any language  |
+| **MAVLink2REST (WebSocket)**   | ~5-15ms  | Easy                  | Full                  | Web UIs, real-time dashboards  |
+| **pymavlink (UDP)**            | ~1-5ms   | Medium                | Full                  | Low-latency autonomous control |
+| **Direct PWM (navigator-lib)** | ~1ms     | Easy (stop ArduPilot) | None                  | Custom vehicles, raw control   |
+| **MAVROS/ROS**                 | ~5-20ms  | Hard (full ROS stack) | Full                  | ROS-based research             |
+| **MAVSDK**                     | ~5-10ms  | Medium                | Limited (PX4-focused) | Not recommended for ArduPilot  |
 
 ### Which method keeps ArduPilot features?
 
-| Feature | MAVLink methods | Direct PWM |
-|---------|----------------|------------|
-| Stabilization / depth hold | Yes | No (must implement) |
-| Sensor fusion / EKF | Yes | No (raw sensors only) |
-| Failsafes | Yes | None |
-| Mission planning | Yes | No |
-| Parameter system | Yes | No |
+| Feature                    | MAVLink methods | Direct PWM            |
+| -------------------------- | --------------- | --------------------- |
+| Stabilization / depth hold | Yes             | No (must implement)   |
+| Sensor fusion / EKF        | Yes             | No (raw sensors only) |
+| Failsafes                  | Yes             | None                  |
+| Mission planning           | Yes             | No                    |
+| Parameter system           | Yes             | No                    |
 
-**Key insight**: MAVLink-based methods (REST, pymavlink, MAVROS) send commands *through* ArduPilot, which handles motor mixing, stabilization, and safety. Direct PWM bypasses all of that -- you get raw hardware control but must implement everything yourself.
+**Key insight**: MAVLink-based methods (REST, pymavlink, MAVROS) send commands _through_ ArduPilot, which handles motor mixing, stabilization, and safety. Direct PWM bypasses all of that -- you get raw hardware control but must implement everything yourself.
 
 ---
 
@@ -341,26 +344,33 @@ asyncio.run(control_loop())
 ### JavaScript WebSocket (Browser)
 
 ```javascript
-const ws = new WebSocket('ws://192.168.2.2/mavlink2rest/ws/mavlink');
+const ws = new WebSocket("ws://192.168.2.2/mavlink2rest/ws/mavlink");
 
 ws.onopen = () => {
-    // Send MANUAL_CONTROL at 20 Hz
-    setInterval(() => {
-        ws.send(JSON.stringify({
-            header: { system_id: 255, component_id: 0, sequence: 0 },
-            message: {
-                type: "MANUAL_CONTROL",
-                target: 1, x: 0, y: 0, z: 0, r: 0, buttons: 0  // z=0 = stop (y=steer, z=throttle)
-            }
-        }));
-    }, 50);
+  // Send MANUAL_CONTROL at 20 Hz
+  setInterval(() => {
+    ws.send(
+      JSON.stringify({
+        header: { system_id: 255, component_id: 0, sequence: 0 },
+        message: {
+          type: "MANUAL_CONTROL",
+          target: 1,
+          x: 0,
+          y: 0,
+          z: 0,
+          r: 0,
+          buttons: 0, // z=0 = stop (y=steer, z=throttle)
+        },
+      }),
+    );
+  }, 50);
 };
 
 ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.message?.type === 'ATTITUDE') {
-        console.log('Attitude:', data.message);
-    }
+  const data = JSON.parse(event.data);
+  if (data.message?.type === "ATTITUDE") {
+    console.log("Attitude:", data.message);
+  }
 };
 ```
 
@@ -377,6 +387,7 @@ pip install pymavlink
 ```
 
 You need a dedicated MAVLink endpoint in BlueOS:
+
 1. Open BlueOS web UI → MAVLink Endpoints
 2. Add endpoint: UDP Client, `192.168.2.1:14551` (or your topside IP)
 3. Connect your script to `udpin:0.0.0.0:14551`
@@ -548,6 +559,7 @@ Package your control logic as a Docker container that runs persistently on the v
 ### Extension Architecture
 
 Extensions are Docker containers managed by the Kraken service. They:
+
 - Start automatically on boot
 - Can expose a web UI (embedded as iframe in BlueOS)
 - Access all BlueOS APIs via internal network
@@ -557,6 +569,7 @@ Extensions are Docker containers managed by the Kraken service. They:
 ### Minimal Extension Example
 
 **Dockerfile:**
+
 ```dockerfile
 FROM python:3.11-slim
 
@@ -579,6 +592,7 @@ CMD ["python", "main.py"]
 ```
 
 **app/main.py:**
+
 ```python
 """BlueOS Extension: Custom thruster/rudder control."""
 import requests
@@ -793,41 +807,41 @@ MODE3 = 15                  # GUIDED
 
 **ArduRover modes:**
 
-| Mode | Number | Description |
-|------|--------|-------------|
-| MANUAL | 0 | Direct RC pass-through (no stabilization) |
-| ACRO | 1 | Rate-controlled steering |
-| STEERING | 3 | Pilot controls throttle, ArduPilot holds heading on neutral stick |
-| HOLD | 4 | Stop and hold position (needs GPS) |
-| LOITER | 5 | Circle around a point (boats only, needs GPS) |
-| FOLLOW | 6 | Follow another MAVLink vehicle |
-| SIMPLE | 7 | Simplified control relative to vehicle heading |
-| CIRCLE | 9 | Orbit a point |
-| AUTO | 10 | Autonomous waypoint missions |
-| RTL | 11 | Return to launch |
-| SMART_RTL | 12 | Retrace path home |
-| GUIDED | 15 | External position/velocity/heading commands |
+| Mode      | Number | Description                                                       |
+| --------- | ------ | ----------------------------------------------------------------- |
+| MANUAL    | 0      | Direct RC pass-through (no stabilization)                         |
+| ACRO      | 1      | Rate-controlled steering                                          |
+| STEERING  | 3      | Pilot controls throttle, ArduPilot holds heading on neutral stick |
+| HOLD      | 4      | Stop and hold position (needs GPS)                                |
+| LOITER    | 5      | Circle around a point (boats only, needs GPS)                     |
+| FOLLOW    | 6      | Follow another MAVLink vehicle                                    |
+| SIMPLE    | 7      | Simplified control relative to vehicle heading                    |
+| CIRCLE    | 9      | Orbit a point                                                     |
+| AUTO      | 10     | Autonomous waypoint missions                                      |
+| RTL       | 11     | Return to launch                                                  |
+| SMART_RTL | 12     | Retrace path home                                                 |
+| GUIDED    | 15     | External position/velocity/heading commands                       |
 
 ### MANUAL_CONTROL Axis Mapping (ArduRover)
 
-| Axis | Range | ArduRover mapping |
-|------|-------|-------------------|
-| x | -1000 to 1000 | Ignored by ArduRover (used by Sub for forward/back) |
-| y | -1000 to 1000 | **Steering** (-1000=full left, 0=straight, 1000=full right) |
-| z | -1000 to 1000 | **Throttle** (-1000=full reverse, 0=stop, 1000=full forward) |
-| r | -1000 to 1000 | Ignored by ArduRover (used by Sub for yaw) |
+| Axis | Range         | ArduRover mapping                                            |
+| ---- | ------------- | ------------------------------------------------------------ |
+| x    | -1000 to 1000 | Ignored by ArduRover (used by Sub for forward/back)          |
+| y    | -1000 to 1000 | **Steering** (-1000=full left, 0=straight, 1000=full right)  |
+| z    | -1000 to 1000 | **Throttle** (-1000=full reverse, 0=stop, 1000=full forward) |
+| r    | -1000 to 1000 | Ignored by ArduRover (used by Sub for yaw)                   |
 
 **Note**: The y→steering, z→throttle mapping is confirmed from ArduRover source code (`Rover/GCS_MAVLink_Rover.cpp`: `manual_override(channel_steer, packet.y, ...)`). Send a gentle z=200 first and confirm the boat moves forward.
 
 ### RC Channel Mapping (ArduRover default)
 
-| RC Channel | Function | SERVO output |
-|------------|----------|-------------|
-| 1 | Steering | SERVO1 (FUNCTION=26, GroundSteering) |
-| 2 | (unused) | - |
-| 3 | Throttle | SERVO3 (FUNCTION=70, Throttle) |
-| 4 | (unused) | - |
-| 7+ | Mode switch, aux functions | - |
+| RC Channel | Function                   | SERVO output                         |
+| ---------- | -------------------------- | ------------------------------------ |
+| 1          | Steering                   | SERVO1 (FUNCTION=26, GroundSteering) |
+| 2          | (unused)                   | -                                    |
+| 3          | Throttle                   | SERVO3 (FUNCTION=70, Throttle)       |
+| 4          | (unused)                   | -                                    |
+| 7+         | Mode switch, aux functions | -                                    |
 
 ---
 
@@ -835,39 +849,39 @@ MODE3 = 15                  # GUIDED
 
 ### Core Repositories
 
-| Repository | Description |
-|------------|-------------|
-| [BlueOS](https://github.com/bluerobotics/BlueOS) | Main OS -- Docker-based, Python/Vue.js/Rust |
-| [mavlink2rest](https://github.com/bluerobotics/mavlink2rest) | REST/WebSocket gateway for MAVLink (Rust) |
-| [navigator-lib](https://github.com/bluerobotics/navigator-lib) | Python/Rust library for Navigator hardware |
-| [BlueOS-Extensions-Repository](https://github.com/bluerobotics/BlueOS-Extensions-Repository) | Central extension registry |
-| [BlueOS-Extension-template](https://github.com/bluerobotics/BlueOS-Extension-template) | Starter template for extensions |
-| [ping-python](https://github.com/bluerobotics/ping-python) | Ping sonar Python library |
-| [ardusub-zola](https://github.com/bluerobotics/ardusub-zola) | ArduSub documentation |
+| Repository                                                                                   | Description                                 |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [BlueOS](https://github.com/bluerobotics/BlueOS)                                             | Main OS -- Docker-based, Python/Vue.js/Rust |
+| [mavlink2rest](https://github.com/bluerobotics/mavlink2rest)                                 | REST/WebSocket gateway for MAVLink (Rust)   |
+| [navigator-lib](https://github.com/bluerobotics/navigator-lib)                               | Python/Rust library for Navigator hardware  |
+| [BlueOS-Extensions-Repository](https://github.com/bluerobotics/BlueOS-Extensions-Repository) | Central extension registry                  |
+| [BlueOS-Extension-template](https://github.com/bluerobotics/BlueOS-Extension-template)       | Starter template for extensions             |
+| [ping-python](https://github.com/bluerobotics/ping-python)                                   | Ping sonar Python library                   |
+| [ardusub-zola](https://github.com/bluerobotics/ardusub-zola)                                 | ArduSub documentation                       |
 
 ### Notable Community Extensions
 
-| Extension | Description |
-|-----------|-------------|
-| Water Linked DVL | DVL A50/A125 integration for positioning |
-| ZeroTier | VPN for remote access |
-| DWE Camera Manager | DeepWater Exploration camera support |
-| Cerulean Sonar | Cerulean sonar integration |
-| Nucleus DVL | Nortek DVL integration |
-| Cockpit | Next-gen web control interface (Blue Robotics) |
+| Extension          | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| Water Linked DVL   | DVL A50/A125 integration for positioning       |
+| ZeroTier           | VPN for remote access                          |
+| DWE Camera Manager | DeepWater Exploration camera support           |
+| Cerulean Sonar     | Cerulean sonar integration                     |
+| Nucleus DVL        | Nortek DVL integration                         |
+| Cockpit            | Next-gen web control interface (Blue Robotics) |
 
 ### Community Resources
 
-| Resource | URL |
-|----------|-----|
-| BlueOS Docs | https://blueos.cloud/docs/stable/ |
-| ArduRover Docs | https://ardupilot.org/rover/ |
-| Blue Robotics Forum | https://discuss.bluerobotics.com/ |
-| Extension Dev Guide | https://blueos.cloud/docs/stable/development/extensions/ |
-| Navigator Dev Guide | https://bluerobotics.com/learn/navigator-developer-guide/ |
-| Navigator Hardware Setup | https://bluerobotics.com/learn/navigator-hardware-setup/ |
-| MAVLink Messages Ref | https://mavlink.io/en/messages/common.html |
-| BlueOS Releases | https://github.com/bluerobotics/BlueOS/releases |
+| Resource                 | URL                                                       |
+| ------------------------ | --------------------------------------------------------- |
+| BlueOS Docs              | https://blueos.cloud/docs/stable/                         |
+| ArduRover Docs           | https://ardupilot.org/rover/                              |
+| Blue Robotics Forum      | https://discuss.bluerobotics.com/                         |
+| Extension Dev Guide      | https://blueos.cloud/docs/stable/development/extensions/  |
+| Navigator Dev Guide      | https://bluerobotics.com/learn/navigator-developer-guide/ |
+| Navigator Hardware Setup | https://bluerobotics.com/learn/navigator-hardware-setup/  |
+| MAVLink Messages Ref     | https://mavlink.io/en/messages/common.html                |
+| BlueOS Releases          | https://github.com/bluerobotics/BlueOS/releases           |
 
 ### Key Forum Threads
 
@@ -880,6 +894,7 @@ MODE3 = 15                  # GUIDED
 ### Academic / Research Use
 
 BlueOS + BlueROV2 is widely used in marine robotics research. Common applications:
+
 - Coral reef monitoring / marine biology surveys
 - Underwater inspection (infrastructure, ships)
 - MATE ROV Competition platforms
@@ -893,6 +908,7 @@ BlueOS + BlueROV2 is widely used in marine robotics research. Common application
 ### For your setup (RPi4 + Navigator, coming from MAVLink/ArduPilot)
 
 **Start with MAVLink2REST** -- it's the path of least resistance:
+
 - No library installs needed (just HTTP)
 - Works from your laptop, a web browser, or an extension
 - Keeps all ArduPilot features (stabilization, failsafes, sensor fusion)
@@ -903,6 +919,7 @@ BlueOS + BlueROV2 is widely used in marine robotics research. Common application
 **If latency matters** (tight control loops, <10ms), use **pymavlink over UDP** with a dedicated MAVLink endpoint.
 
 **Only use direct PWM (navigator-lib)** if:
+
 - You're building a non-standard vehicle frame ArduPilot doesn't support
 - You want to implement your own control system from scratch
 - You're bench-testing individual actuators
@@ -964,14 +981,14 @@ Since you used MAVLink with ArduPilot before, the good news is **MAVLink2REST wr
 
 ArduPilot does NOT blend inputs. The active **flight mode** determines which input source drives the vehicle:
 
-| Mode | Who drives | RC sticks | Companion commands |
-|------|-----------|-----------|-------------------|
-| MANUAL (0) | RC pilot | **Active** -- direct pass-through | Ignored (unless RC_CHANNELS_OVERRIDE sent) |
-| STEERING (3) | RC pilot | **Active** -- heading hold on neutral stick | Ignored (unless RC_CHANNELS_OVERRIDE sent) |
-| GUIDED (15) | Companion | Ignored | **Active** -- position/velocity/heading targets via MAVLink |
-| AUTO (10) | Mission | Ignored | Mission waypoints only |
-| HOLD (4) | Nobody | Vehicle holds position (GPS) | Ignored |
-| LOITER (5) | Nobody | Boat circles a point (GPS) | Ignored |
+| Mode         | Who drives | RC sticks                                   | Companion commands                                          |
+| ------------ | ---------- | ------------------------------------------- | ----------------------------------------------------------- |
+| MANUAL (0)   | RC pilot   | **Active** -- direct pass-through           | Ignored (unless RC_CHANNELS_OVERRIDE sent)                  |
+| STEERING (3) | RC pilot   | **Active** -- heading hold on neutral stick | Ignored (unless RC_CHANNELS_OVERRIDE sent)                  |
+| GUIDED (15)  | Companion  | Ignored                                     | **Active** -- position/velocity/heading targets via MAVLink |
+| AUTO (10)    | Mission    | Ignored                                     | Mission waypoints only                                      |
+| HOLD (4)     | Nobody     | Vehicle holds position (GPS)                | Ignored                                                     |
+| LOITER (5)   | Nobody     | Boat circles a point (GPS)                  | Ignored                                                     |
 
 **Critical nuance**: `RC_CHANNELS_OVERRIDE` and `MANUAL_CONTROL` from the companion **override physical RC** regardless of mode. They replace the RC input at the protocol level. This is powerful but dangerous -- the mode-based approach above is safer because the pilot can always flip back to MANUAL.
 
@@ -1003,6 +1020,7 @@ MODE3 = 15                  # Switch HIGH (~1815us) → GUIDED (companion NUC co
 **Note**: `MODE_CH` defaults to channel 8 in ArduRover. Set it to whichever RC channel your 3-position switch is on. The channel must not conflict with stick channels (typically 1 and 3 for steering/throttle).
 
 PWM mapping for a 3-position switch:
+
 - ~1000-1230 us → MODE1
 - ~1231-1360 us → MODE2
 - ~1361-1490 us → MODE3
@@ -1017,6 +1035,7 @@ RC8_OPTION = 46             # "RC Override Enable" on channel 8 (2-pos switch)
 ```
 
 A 2-position switch on channel 8:
+
 - **LOW**: MAVLink overrides allowed (companion can send commands)
 - **HIGH**: MAVLink overrides blocked (physical RC has absolute priority)
 
@@ -1079,6 +1098,7 @@ def set_mode(mode_number):
 #### Recommended: Ethernet (network)
 
 Best option if the NUC has an ethernet port. Connect NUC to Pi via:
+
 - Direct ethernet cable (Pi gets IP from BlueOS DHCP, typically `192.168.2.x`)
 - Or an ethernet switch in the vehicle
 
@@ -1091,6 +1111,7 @@ If the NUC connects to the Pi via USB, the Pi can expose a USB Ethernet gadget (
 #### Not recommended: raw USB serial
 
 Raw serial (`/dev/ttyACMx`) works but creates friction:
+
 - Need `--device /dev/ttyACM0` in Docker
 - Device names can change on reconnect
 - Need to configure a BlueOS serial bridge
@@ -1136,13 +1157,13 @@ Unlike ArduSub (which needs DVL for position), **ArduRover GUIDED mode works out
 
 In GUIDED mode, the companion NUC can command:
 
-| Command | Message | Key fields |
-|---------|---------|------------|
-| **Go to position** | `SET_POSITION_TARGET_GLOBAL_INT` | lat, lon (x1e7), type_mask=`3580` |
-| **Set velocity** | `SET_POSITION_TARGET_LOCAL_NED` | vx, vy (m/s), type_mask=`3559` |
-| **Set heading** | `SET_POSITION_TARGET_LOCAL_NED` | yaw (radians), type_mask=`2559` |
-| **Set turn rate** | `SET_POSITION_TARGET_LOCAL_NED` | yaw_rate (rad/s), type_mask=`1535` |
-| **Set heading + speed** | `SET_ATTITUDE_TARGET` | quaternion + thrust (-1..1), type_mask=`39` |
+| Command                 | Message                          | Key fields                                  |
+| ----------------------- | -------------------------------- | ------------------------------------------- |
+| **Go to position**      | `SET_POSITION_TARGET_GLOBAL_INT` | lat, lon (x1e7), type_mask=`3580`           |
+| **Set velocity**        | `SET_POSITION_TARGET_LOCAL_NED`  | vx, vy (m/s), type_mask=`3559`              |
+| **Set heading**         | `SET_POSITION_TARGET_LOCAL_NED`  | yaw (radians), type_mask=`2559`             |
+| **Set turn rate**       | `SET_POSITION_TARGET_LOCAL_NED`  | yaw_rate (rad/s), type_mask=`1535`          |
+| **Set heading + speed** | `SET_ATTITUDE_TARGET`            | quaternion + thrust (-1..1), type_mask=`39` |
 
 **Velocity commands must be re-sent every second** -- the vehicle stops after 3 seconds of silence.
 
@@ -1185,14 +1206,14 @@ This is the lowest-friction path to get the companion controlling the boat.
 
 ### RC_CHANNELS_OVERRIDE vs MANUAL_CONTROL: Which to Use
 
-| | RC_CHANNELS_OVERRIDE | MANUAL_CONTROL |
-|-|---------------------|----------------|
-| **Granularity** | Per-channel PWM (1100-1900us) | Axes: x/y/z/r (-1000 to 1000) |
-| **Interacts with** | Replaces RC input channels | Replaces joystick input |
-| **Mode-aware** | No -- always overrides RC regardless of mode | Yes -- processed per mode logic |
-| **Per-channel passthrough** | Yes -- send `0` to pass channel to physical RC | No -- all-or-nothing |
-| **Safety** | Dangerous -- overrides RC even in MANUAL | Slightly safer -- respects mode |
-| **Use case** | Direct actuator control, custom mixing | Virtual joystick, companion control |
+|                             | RC_CHANNELS_OVERRIDE                           | MANUAL_CONTROL                      |
+| --------------------------- | ---------------------------------------------- | ----------------------------------- |
+| **Granularity**             | Per-channel PWM (1100-1900us)                  | Axes: x/y/z/r (-1000 to 1000)       |
+| **Interacts with**          | Replaces RC input channels                     | Replaces joystick input             |
+| **Mode-aware**              | No -- always overrides RC regardless of mode   | Yes -- processed per mode logic     |
+| **Per-channel passthrough** | Yes -- send `0` to pass channel to physical RC | No -- all-or-nothing                |
+| **Safety**                  | Dangerous -- overrides RC even in MANUAL       | Slightly safer -- respects mode     |
+| **Use case**                | Direct actuator control, custom mixing         | Virtual joystick, companion control |
 
 **Recommendation**: Use `MANUAL_CONTROL` from the companion. It respects ArduPilot's mode logic and motor mixing. Only use `RC_CHANNELS_OVERRIDE` if you need per-channel control or need to override specific channels while passing others through to physical RC.
 
@@ -1200,16 +1221,16 @@ This is the lowest-friction path to get the companion controlling the boat.
 
 ArduPilot validates and clamps, but doesn't reject silently in all cases:
 
-| Input | ArduPilot behavior |
-|-------|-------------------|
-| `MANUAL_CONTROL` x=5000 (out of range) | **Clamped** to -1000..1000 |
-| `RC_CHANNELS_OVERRIDE` chan=2500us | **Clamped** to RCx_MIN..RCx_MAX |
-| `RC_CHANNELS_OVERRIDE` chan=0 | **Pass-through** to physical RC for that channel |
-| `RC_CHANNELS_OVERRIDE` chan=65535 | **Ignored** (field not used) |
-| `COMMAND_LONG` with invalid command | Returns `MAV_RESULT_UNSUPPORTED` or `MAV_RESULT_DENIED` |
-| `SET_MODE` to invalid mode number | Returns `MAV_RESULT_FAILED`, mode unchanged |
-| Any command while disarmed | Thrusters won't spin regardless (except `DO_SET_SERVO` which can bypass arming) |
-| `MANUAL_CONTROL` at <1 Hz | **Timeout** -- ArduPilot stops responding after ~1s (`JS_TIMEOUT`) |
+| Input                                  | ArduPilot behavior                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| `MANUAL_CONTROL` x=5000 (out of range) | **Clamped** to -1000..1000                                                      |
+| `RC_CHANNELS_OVERRIDE` chan=2500us     | **Clamped** to RCx_MIN..RCx_MAX                                                 |
+| `RC_CHANNELS_OVERRIDE` chan=0          | **Pass-through** to physical RC for that channel                                |
+| `RC_CHANNELS_OVERRIDE` chan=65535      | **Ignored** (field not used)                                                    |
+| `COMMAND_LONG` with invalid command    | Returns `MAV_RESULT_UNSUPPORTED` or `MAV_RESULT_DENIED`                         |
+| `SET_MODE` to invalid mode number      | Returns `MAV_RESULT_FAILED`, mode unchanged                                     |
+| Any command while disarmed             | Thrusters won't spin regardless (except `DO_SET_SERVO` which can bypass arming) |
+| `MANUAL_CONTROL` at <1 Hz              | **Timeout** -- ArduPilot stops responding after ~1s (`JS_TIMEOUT`)              |
 
 **Validate on the companion side anyway.** ArduPilot clamps values but doesn't distinguish between "intentional full throttle" and "bug sent 9999". A rogue command at full thrust with no sanity check could be dangerous.
 
@@ -1244,12 +1265,12 @@ def send_heartbeat():
 
 ### Command Rate Requirements
 
-| Message | Minimum rate | Timeout | What happens on timeout |
-|---------|-------------|---------|------------------------|
-| `MANUAL_CONTROL` | ~10 Hz | `JS_TIMEOUT` (default 1000ms) | ArduPilot treats as zero input |
-| `RC_CHANNELS_OVERRIDE` | ~10 Hz | `RC_OVERRIDE_TIME` (default 3s) | Falls back to physical RC |
-| Position targets (GUIDED) | ≥25 Hz | ~1-2s | Vehicle stops / holds position |
-| Heartbeat | 1 Hz | `FS_GCS_TIMEOUT` (default 5s) | GCS failsafe triggers |
+| Message                   | Minimum rate | Timeout                         | What happens on timeout        |
+| ------------------------- | ------------ | ------------------------------- | ------------------------------ |
+| `MANUAL_CONTROL`          | ~10 Hz       | `JS_TIMEOUT` (default 1000ms)   | ArduPilot treats as zero input |
+| `RC_CHANNELS_OVERRIDE`    | ~10 Hz       | `RC_OVERRIDE_TIME` (default 3s) | Falls back to physical RC      |
+| Position targets (GUIDED) | ≥25 Hz       | ~1-2s                           | Vehicle stops / holds position |
+| Heartbeat                 | 1 Hz         | `FS_GCS_TIMEOUT` (default 5s)   | GCS failsafe triggers          |
 
 ### Mode Switch Race Conditions
 
@@ -1260,6 +1281,7 @@ def send_heartbeat():
 **The fix**: The companion should **not** forcibly set modes. It should only **read** the current mode and react. The pilot controls mode via the physical switch. The companion watches for GUIDED and starts/stops commanding accordingly.
 
 **Exception**: If you want the companion to request a mode change (e.g., for autonomous mission start), you'd need:
+
 1. No `MODE_CH` assigned (disable RC mode switching), OR
 2. A dedicated "companion control" switch that sets `RC_OPTIONS` bit 0 (ignore RC receiver), OR
 3. Use `RCx_OPTION = 76` (STANDBY) which explicitly hands off to the companion
@@ -1267,6 +1289,7 @@ def send_heartbeat():
 ### USB Disconnect / Reconnect
 
 If the NUC-to-Pi USB cable disconnects:
+
 - Network-over-USB link drops immediately
 - MAVLink2REST WebSocket connection breaks
 - `RC_OVERRIDE_TIME` expires (3s) → ArduPilot falls back to physical RC
@@ -1307,6 +1330,7 @@ COMPANION_SYSTEM_ID = 254  # or any unused ID
 ```
 
 `SYSID_MYGCS` controls which system ID is accepted for `RC_CHANNELS_OVERRIDE`. Only **one** system ID is accepted. If QGC (255) and the companion (254) both need to send RC overrides, this is a conflict. Solutions:
+
 - Only one sender uses `RC_CHANNELS_OVERRIDE`; the other uses `MANUAL_CONTROL`
 - Change `SYSID_MYGCS` dynamically (not practical)
 - Use `MANUAL_CONTROL` from the companion (no `SYSID_MYGCS` restriction)

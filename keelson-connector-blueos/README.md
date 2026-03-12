@@ -66,12 +66,12 @@ GPS subjects are only published when the GPS reader is enabled and has a fix (`f
 
 The connector subscribes to command subjects with a wildcard source (`**`) so it receives commands from any source (gamepad, autonomy, UI, etc.).
 
-| Subject                | Protobuf Type       | Handling                                                       |
-| ---------------------- | ------------------- | -------------------------------------------------------------- |
-| `cmd_manual_control`   | `TimestampedString` | JSON `{"steering":N,"throttle":N}`, fed into CommandMux        |
-| `cmd_arm`              | `TimestampedBool`   | `true` → POST `/command/arm`, `false` → POST `/command/disarm` |
-| `cmd_set_mode`         | `TimestampedString` | Mode name/number → POST `/command/set_mode`                    |
-| `cmd_active_source`    | `TimestampedString` | Manual override of active mux source                           |
+| Subject              | Protobuf Type       | Handling                                                       |
+| -------------------- | ------------------- | -------------------------------------------------------------- |
+| `cmd_manual_control` | `TimestampedString` | JSON `{"steering":N,"throttle":N}`, fed into CommandMux        |
+| `cmd_arm`            | `TimestampedBool`   | `true` → POST `/command/arm`, `false` → POST `/command/disarm` |
+| `cmd_set_mode`       | `TimestampedString` | Mode name/number → POST `/command/set_mode`                    |
+| `cmd_active_source`  | `TimestampedString` | Manual override of active mux source                           |
 
 The CommandMux applies priority-based arbitration to `cmd_manual_control` — the source ID from the key (e.g. `gamepad/0`) determines priority. Higher-priority sources preempt lower ones. If a source stops publishing, it times out (default 0.5s for gamepad) and falls through.
 
