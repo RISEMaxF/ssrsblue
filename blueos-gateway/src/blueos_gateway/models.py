@@ -68,6 +68,7 @@ class VehicleStatusResponse(BaseModel):
     last_command_steering: float | None
     last_command_throttle: float | None
     last_command_age_s: float | None
+    motor_mode: str | None
 
 
 class GPSStatusResponse(BaseModel):

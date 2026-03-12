@@ -52,6 +52,9 @@ class VehicleState:
     last_command_throttle: float | None = None
     last_command_received: float = 0.0
 
+    # Motor mode (from SCR_USER1 PARAM_VALUE)
+    motor_mode: str | None = None  # None = unknown, "blue_robotics" / "all" / "flipsky"
+
     # Timestamps (monotonic)
     last_heartbeat_received: float = field(default_factory=time.monotonic)
 
@@ -92,3 +95,12 @@ class VehicleState:
         self.heading = msg.get("heading", 0)
         self.groundspeed = msg.get("groundspeed", 0.0)
         self.throttle = msg.get("throttle", 0)
+
+    def update_from_param_value(self, msg: dict) -> None:
+        param_id = msg.get("param_id", "")
+        if param_id == "SCR_USER1":
+            value = int(msg.get("param_value", 0))
+            self.motor_mode = _MOTOR_MODE_NAMES.get(value)
+
+
+_MOTOR_MODE_NAMES: dict[int, str] = {0: "blue_robotics", 1: "all", 2: "flipsky"}

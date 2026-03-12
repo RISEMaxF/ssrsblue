@@ -3,6 +3,9 @@
 -- Reads ArduPilot's internal throttle/steering demands and distributes
 -- them to three independent servo outputs via scripting servo functions.
 --
+-- Uses set_output_pwm_chan_timeout() so that if this script crashes,
+-- outputs revert to servo trim (neutral) within 100ms automatically.
+--
 -- Motor mode is selected by:
 --   1. RC aux switch (RCx_OPTION=300) — physical override, always wins
 --   2. SCR_USER1 parameter — software control via MAVLink PARAM_SET
@@ -33,6 +36,31 @@ local MODE_BLUE = 0
 local MODE_ALL = 1
 local MODE_FLIPSKY = 2
 
+-- Timeout for set_output_pwm_chan_timeout (ms).
+-- If the script crashes, outputs revert to servo trim after this period.
+local PWM_TIMEOUT_MS = 100
+
+-- ESC PWM range (standard for Blue Robotics Basic ESC and most ESCs)
+local PWM_MIN = 1100
+local PWM_TRIM = 1500
+local PWM_MAX = 1900
+
+-- Look up physical channel numbers (zero-indexed) for each scripting function.
+-- These are needed for set_output_pwm_chan_timeout().
+local chan1 = SRV_Channels:find_channel(K_SCRIPT1)
+local chan2 = SRV_Channels:find_channel(K_SCRIPT2)
+local chan3 = SRV_Channels:find_channel(K_SCRIPT3)
+
+if not chan1 or not chan2 or not chan3 then
+    gcs:send_text(3, "motor_mixer: SERVO functions 94/95/96 not all assigned!")
+    gcs:send_text(3, string.format("motor_mixer: ch1=%s ch2=%s ch3=%s",
+        tostring(chan1), tostring(chan2), tostring(chan3)))
+    -- Return nil to stop the script — can't run without all 3 channels
+    return
+end
+
+gcs:send_text(6, string.format("motor_mixer: channels=%d/%d/%d", chan1, chan2, chan3))
+
 -- Try to find the RC switch assigned to Scripting1 (RCx_OPTION=300)
 local rc_switch = rc:find_channel_for_option(300)
 if rc_switch then
@@ -45,6 +73,20 @@ end
 local user_mode = Parameter('SCR_USER1')
 
 local last_mode = -1
+
+-- Convert normalized value (-1..1) to PWM
+local function norm_to_pwm(value)
+    if value >= 0 then
+        return math.floor(PWM_TRIM + value * (PWM_MAX - PWM_TRIM) + 0.5)
+    else
+        return math.floor(PWM_TRIM + value * (PWM_TRIM - PWM_MIN) + 0.5)
+    end
+end
+
+-- Write PWM with timeout — reverts to trim if script stops calling
+local function set_output(chan, norm_value)
+    SRV_Channels:set_output_pwm_chan_timeout(chan, norm_to_pwm(norm_value), PWM_TIMEOUT_MS)
+end
 
 local function get_motor_mode()
     -- RC switch takes priority if assigned (all positions are meaningful)
@@ -83,9 +125,9 @@ local function update()
 
     if not arming:is_armed() then
         -- Zero all outputs when disarmed
-        SRV_Channels:set_output_norm(K_SCRIPT1, 0)
-        SRV_Channels:set_output_norm(K_SCRIPT2, 0)
-        SRV_Channels:set_output_norm(K_SCRIPT3, 0)
+        set_output(chan1, 0)
+        set_output(chan2, 0)
+        set_output(chan3, 0)
         return update, 20  -- 50Hz
     end
 
@@ -94,9 +136,9 @@ local function update()
 
     if not throttle or not steering then
         -- Zero outputs if control data unavailable (e.g. during init)
-        SRV_Channels:set_output_norm(K_SCRIPT1, 0)
-        SRV_Channels:set_output_norm(K_SCRIPT2, 0)
-        SRV_Channels:set_output_norm(K_SCRIPT3, 0)
+        set_output(chan1, 0)
+        set_output(chan2, 0)
+        set_output(chan3, 0)
         return update, 20
     end
 
@@ -133,9 +175,9 @@ local function update()
     -- Clamp flipsky independently (it's a separate motor group)
     flipsky = math.max(-1, math.min(1, flipsky))
 
-    SRV_Channels:set_output_norm(K_SCRIPT1, left)
-    SRV_Channels:set_output_norm(K_SCRIPT2, right)
-    SRV_Channels:set_output_norm(K_SCRIPT3, flipsky)
+    set_output(chan1, left)
+    set_output(chan2, right)
+    set_output(chan3, flipsky)
 
     return update, 20  -- 50Hz
 end

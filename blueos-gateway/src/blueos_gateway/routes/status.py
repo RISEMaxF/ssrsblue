@@ -31,6 +31,7 @@ async def get_status(request: Request) -> VehicleStatusResponse:
             round(time.monotonic() - s.last_command_received, 1)
             if s.last_command_received > 0 else None
         ),
+        motor_mode=s.motor_mode,
     )
 
 

@@ -58,7 +58,7 @@ class MAVLinkClient:
     # ── Telemetry (WebSocket) ──────────────────────────────
 
     async def _telemetry_loop(self) -> None:
-        msg_filter = "HEARTBEAT|GPS_RAW_INT|SYS_STATUS|VFR_HUD|COMMAND_ACK"
+        msg_filter = "HEARTBEAT|GPS_RAW_INT|SYS_STATUS|VFR_HUD|COMMAND_ACK|PARAM_VALUE"
         url = f"{self.config.mavlink_ws_url}?filter={msg_filter}"
         backoff = 1.0
 
@@ -70,6 +70,9 @@ class MAVLinkClient:
                     self.state.mavlink_connected = True
                     backoff = 1.0
                     logger.info("WebSocket connected to %s", url)
+
+                    # Request current SCR_USER1 value for motor mode readback
+                    await self._request_param("SCR_USER1")
 
                     async for raw in ws:
                         try:
@@ -111,6 +114,8 @@ class MAVLinkClient:
             self.state.update_from_vfr_hud(body)
         elif mtype == "COMMAND_ACK":
             self._handle_command_ack(body)
+        elif mtype == "PARAM_VALUE":
+            self.state.update_from_param_value(body)
 
     def _handle_command_ack(self, body: dict) -> None:
         cmd_name = body.get("command", {}).get("type", "")
@@ -208,6 +213,18 @@ class MAVLinkClient:
                 "param5": 0.0,
                 "param6": 0.0,
                 "param7": 0.0,
+            },
+        }
+
+    def _build_param_request_read(self, param_id: str) -> dict:
+        return {
+            "header": self._header(),
+            "message": {
+                "type": "PARAM_REQUEST_READ",
+                "target_system": self.config.target_system,
+                "target_component": self.config.target_component,
+                "param_id": param_id,
+                "param_index": -1,
             },
         }
 
@@ -363,6 +380,10 @@ class MAVLinkClient:
 
     async def send_arm(self, arm: bool) -> CommandResult:
         return await self._send_command_long(self._build_arm_disarm(arm))
+
+    async def _request_param(self, param_id: str) -> None:
+        """Request a parameter value from the vehicle (fire-and-forget)."""
+        await self.send_message(self._build_param_request_read(param_id))
 
     async def send_param_set(self, param_id: str, value: float) -> bool:
         return await self.send_message(
